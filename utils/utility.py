@@ -134,9 +134,12 @@ class checkpoint():
             self.log_file.close()
             self.log_file = open(self.dir + '/log.txt', 'a')
 
-            # For Google Drive
-            copyfile(self.dir + '/log.txt', self.local_dir +
-                     '/log.txt') if self.local_dir is not None else None
+    # 안전하게 복사: src ≠ dst 일 때만
+            src_log = os.path.join(self.dir, 'log.txt')
+            dst_log = os.path.join(self.local_dir, 'log.txt') if self.local_dir is not None else None
+            if dst_log is not None and os.path.abspath(src_log) != os.path.abspath(dst_log):
+                copyfile(src_log, dst_log)
+
 
     def done(self):
         self.log_file.close()
