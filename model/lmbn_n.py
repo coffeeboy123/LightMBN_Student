@@ -21,14 +21,14 @@ class LMBN_n(nn.Module):
 
 
         self.global_branch = nn.Sequential(copy.deepcopy(osnet.conv1), copy.deepcopy(osnet.conv2), copy.deepcopy(osnet.maxpool), copy.deepcopy(osnet.conv3),
-            copy.deepcopy(osnet.conv4),copy.deepcopy(osnet.conv4))
+            copy.deepcopy(osnet.conv4),copy.deepcopy(osnet.conv5))
 
 
         self.partial_branch = nn.Sequential(copy.deepcopy(osnet.conv1), copy.deepcopy(osnet.conv2), copy.deepcopy(osnet.maxpool), copy.deepcopy(osnet.conv3),
-            copy.deepcopy(osnet.conv4),copy.deepcopy(osnet.conv4))
+            copy.deepcopy(osnet.conv4),copy.deepcopy(osnet.conv5))
         
         self.channel_branch = nn.Sequential(copy.deepcopy(osnet.conv1), copy.deepcopy(osnet.conv2), copy.deepcopy(osnet.maxpool), copy.deepcopy(osnet.conv3),
-            copy.deepcopy(osnet.conv4),copy.deepcopy(osnet.conv4))
+            copy.deepcopy(osnet.conv4),copy.deepcopy(osnet.conv5))
         self.global_pooling = nn.AdaptiveMaxPool2d((1, 1))
         self.partial_pooling = nn.AdaptiveAvgPool2d((2, 1))
         self.channel_pooling = nn.AdaptiveAvgPool2d((1, 1))
