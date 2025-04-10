@@ -97,8 +97,11 @@ class checkpoint():
             del dic['load'], dic['save'], dic['pre_train'], dic['test_only'], dic['re_rank'], dic['activation_map'], dic['nep_token']
             yaml.dump(dic, fp, default_flow_style=False)
 
-        copyfile(self.dir + '/config.yaml', self.local_dir +
-                 '/config.yaml') if self.local_dir is not None else None
+        src_config = os.path.join(self.dir, 'config.yaml')
+        dst_config = os.path.join(self.local_dir, 'config.yaml') if self.local_dir is not None else None
+
+        if dst_config is not None and os.path.abspath(src_config) != os.path.abspath(dst_config):
+            copyfile(src_config, dst_config)
 
     def add_log(self, log):
         self.log = torch.cat([self.log, log])
