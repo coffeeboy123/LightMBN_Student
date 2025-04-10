@@ -45,9 +45,9 @@ class checkpoint():
 
         ##### Only works when using google drive and colab #####
         self.local_dir = None
-        if ROOT_PATH[:11] == '/content/dr':
+        if ROOT_PATH[:11] == '/content':
 
-            self.dir = osp.join('/content/drive/Shareddrives/Colab',
+            self.dir = osp.join('/content/gdrive/Mydrive/LightMBN',
                                 self.dir[self.dir.find('experiment'):])
             self.local_dir = ROOT_PATH + \
                 '/experiment/' + self.dir.split('/')[-1]

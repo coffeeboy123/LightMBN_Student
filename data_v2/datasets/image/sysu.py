@@ -25,7 +25,7 @@ class SYSU(ImageDataset):
         - images: 12936 (train) + 3368 (query) + 15913 (gallery).
     """
     _junk_pids = [0, -1]
-    dataset_dir = 'Market-1501'
+    dataset_dir = 'SYSU'
 
 
     def __init__(self, root='', market1501_500k=False, **kwargs):
