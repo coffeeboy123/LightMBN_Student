@@ -33,8 +33,8 @@ class checkpoint():
         ROOT_PATH = os.path.abspath(
             os.path.join(os.path.dirname(__file__), '..'))
         
-        print("root_path : ", ROOT_PATH)
-        ###### 주석 test
+        # print("root_path : ", ROOT_PATH)
+        # ###### 주석 test
 
         if args.load == '':
             if args.save == '':
@@ -48,13 +48,13 @@ class checkpoint():
 
         ##### Only works when using google drive and colab #####
         self.local_dir = None
-        if ROOT_PATH[:11] == '/content':
+        # if ROOT_PATH[:11] == '/content/dir':
 
-            self.dir = osp.join('/content/gdrive/Mydrive/LightMBN',
-                                self.dir[self.dir.find('experiment'):])
-            self.local_dir = ROOT_PATH + \
-                '/experiment/' + self.dir.split('/')[-1]
-            _make_dir(self.local_dir)
+        self.dir = osp.join('/content/gdrive/Mydrive/LightMBN',
+                            self.dir[self.dir.find('experiment'):])
+        self.local_dir = ROOT_PATH + \
+            '/experiment/' + self.dir.split('/')[-1]
+        _make_dir(self.local_dir)
         ############################################
 
         _make_dir(self.dir)
