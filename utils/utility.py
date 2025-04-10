@@ -35,6 +35,7 @@ class checkpoint():
         
         # print("root_path : ", ROOT_PATH)
         # ###### 주석 test
+        #test
 
         if args.load == '':
             if args.save == '':
