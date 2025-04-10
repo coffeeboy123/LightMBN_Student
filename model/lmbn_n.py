@@ -16,26 +16,19 @@ class LMBN_n(nn.Module):
         self.n_ch = 2
         self.chs = 512 // self.n_ch
 
-        osnet = osnet_x0_25(pretrained=True)
-
-        self.backone = nn.Sequential(
-            osnet.conv1,
-            osnet.conv2,
-            osnet.maxpool
-        )
+        osnet = osnet_x1_0(pretrained=True)
 
 
 
-        self.global_branch = nn.Sequential(copy.deepcopy(osnet.conv3),
-            nn.Conv2d(96, 512, kernel_size=1, stride=1, padding=0, bias=False))
+        self.global_branch = nn.Sequential(copy.deepcopy(osnet.conv1), copy.deepcopy(osnet.conv2), copy.deepcopy(osnet.maxpool), copy.deepcopy(osnet.conv3),
+            copy.deepcopy(osnet.conv4),copy.deepcopy(osnet.conv4))
 
 
-        self.partial_branch = nn.Sequential(copy.deepcopy(osnet.conv3),
-            nn.Conv2d(96, 512, kernel_size=1, stride=1, padding=0, bias=False))
-
-        self.channel_branch = nn.Sequential(copy.deepcopy(osnet.conv3),
-            nn.Conv2d(96, 512, kernel_size=1, stride=1, padding=0, bias=False))
-
+        self.partial_branch = nn.Sequential(copy.deepcopy(osnet.conv1), copy.deepcopy(osnet.conv2), copy.deepcopy(osnet.maxpool), copy.deepcopy(osnet.conv3),
+            copy.deepcopy(osnet.conv4),copy.deepcopy(osnet.conv4))
+        
+        self.channel_branch = nn.Sequential(copy.deepcopy(osnet.conv1), copy.deepcopy(osnet.conv2), copy.deepcopy(osnet.maxpool), copy.deepcopy(osnet.conv3),
+            copy.deepcopy(osnet.conv4),copy.deepcopy(osnet.conv4))
         self.global_pooling = nn.AdaptiveMaxPool2d((1, 1))
         self.partial_pooling = nn.AdaptiveAvgPool2d((2, 1))
         self.channel_pooling = nn.AdaptiveAvgPool2d((1, 1))
@@ -72,7 +65,7 @@ class LMBN_n(nn.Module):
         # if self.batch_drop_block is not None:
         #     x = self.batch_drop_block(x)
 
-        x = self.backone(x)
+        #x = self.backone(x)
 
         glo = self.global_branch(x)
         par = self.partial_branch(x)
