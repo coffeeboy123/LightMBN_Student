@@ -46,6 +46,10 @@ class checkpoint():
                 args.load = ''
             args.save = args.load
 
+        if 'gdrive' in self.dir:
+            print('[WARNING] Google Drive path detected. Switching to local experiment folder.')
+            self.dir = os.path.join(ROOT_PATH, 'experiment', args.save) 
+
         ##### Only works when using google drive and colab #####
         self.local_dir = None
         # if ROOT_PATH[:11] == '/content/dir':
