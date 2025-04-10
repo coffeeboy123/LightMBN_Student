@@ -34,6 +34,7 @@ class checkpoint():
             os.path.join(os.path.dirname(__file__), '..'))
         
         # print("root_path : ", ROOT_PATH)
+        ###### 주석 test
 
         if args.load == '':
             if args.save == '':
