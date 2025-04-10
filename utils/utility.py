@@ -33,7 +33,7 @@ class checkpoint():
         ROOT_PATH = os.path.abspath(
             os.path.join(os.path.dirname(__file__), '..'))
         
-        print("root_path : ", ROOT_PATH)
+        # print("root_path : ", ROOT_PATH)
 
         if args.load == '':
             if args.save == '':
