@@ -46,19 +46,15 @@ class checkpoint():
                 args.load = ''
             args.save = args.load
 
-        if 'gdrive' in self.dir:
-            print('[WARNING] Google Drive path detected. Switching to local experiment folder.')
-            self.dir = os.path.join(ROOT_PATH, 'experiment', args.save) 
-
         ##### Only works when using google drive and colab #####
         self.local_dir = None
         # if ROOT_PATH[:11] == '/content/dir':
 
-#        self.dir = osp.join('/content/gdrive/Mydrive/LightMBN',
-#                            self.dir[self.dir.find('experiment'):])
-#        self.local_dir = ROOT_PATH + \
-#            '/experiment/' + self.dir.split('/')[-1]
-#        _make_dir(self.local_dir)
+        self.dir = osp.join('/content/gdrive/Mydrive/LightMBN',
+                            self.dir[self.dir.find('experiment'):])
+        self.local_dir = ROOT_PATH + \
+            '/experiment/' + self.dir.split('/')[-1]
+        _make_dir(self.local_dir)
         ############################################
 
         _make_dir(self.dir)
@@ -96,8 +92,8 @@ class checkpoint():
             del dic['load'], dic['save'], dic['pre_train'], dic['test_only'], dic['re_rank'], dic['activation_map'], dic['nep_token']
             yaml.dump(dic, fp, default_flow_style=False)
 
-#        copyfile(self.dir + '/config.yaml', self.local_dir +
-#                 '/config.yaml') if self.local_dir is not None else None
+        copyfile(self.dir + '/config.yaml', self.local_dir +
+                 '/config.yaml') if self.local_dir is not None else None
 
     def add_log(self, log):
         self.log = torch.cat([self.log, log])
