@@ -222,11 +222,11 @@ class OSNet(nn.Module):
         self.maxpool = nn.MaxPool2d(3, stride=2, padding=1)
         self.conv2 = self._make_layer(blocks[0], layers[0], channels[0], channels[1], reduce_spatial_size=True, IN=IN)
         self.conv3 = self._make_layer(blocks[1], layers[1], channels[1], channels[2], reduce_spatial_size=True)
-
-        self.conv5 = Conv1x1(channels[2], channels[2])
+        self.conv4 = self._make_layer(blocks[2], layers[2], channels[2], channels[3], reduce_spatial_size=False)
+        self.conv5 = Conv1x1(channels[3], channels[3])
         self.global_avgpool = nn.AdaptiveAvgPool2d(1)
         # fully connected layer
-        self.fc = self._construct_fc_layer(feature_dim, channels[2], dropout_p=None)
+        self.fc = self._construct_fc_layer(feature_dim, channels[3], dropout_p=None)
         # identity classification layer
         self.classifier = nn.Linear(self.feature_dim, num_classes)
 
