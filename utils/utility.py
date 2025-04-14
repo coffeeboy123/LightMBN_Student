@@ -40,9 +40,9 @@ class checkpoint():
         if args.load == '':
             if args.save == '':
                 args.save = now
-            self.dir = ROOT_PATH + '/experiment/' + args.save
+            self.dir = '/content/gdrive' + '/experiment/' + args.save
         else:
-            self.dir = ROOT_PATH + '/experiment/' + args.load
+            self.dir = '/content/gdrive' + '/experiment/' + args.load
             if not os.path.exists(self.dir):
                 args.load = ''
             args.save = args.load
@@ -53,10 +53,10 @@ class checkpoint():
 
         ##### Only works when using google drive and colab #####
         self.local_dir = None
-        if ROOT_PATH[:11] == '/content/dir':
-            self.dir = osp.join('/content/gdrive/Mydrive/LightMBN_log',
-            self.dir[self.dir.find('experiment'):])
+        # if ROOT_PATH[:11] == '/content/dir':
 
+ #       self.dir = osp.join('/content/gdrive/Mydrive/LightMBN',
+ #                           self.dir[self.dir.find('experiment'):])
         self.local_dir = ROOT_PATH + \
             '/experiment/' + self.dir.split('/')[-1]
         _make_dir(self.local_dir)
@@ -102,10 +102,6 @@ class checkpoint():
 
         if dst_config is not None and os.path.abspath(src_config) != os.path.abspath(dst_config):
             copyfile(src_config, dst_config)
-
-        print("저장 경로:", self.dir)
-        print("로컬 경로:", self.local_dir)
-
 
     def add_log(self, log):
         self.log = torch.cat([self.log, log])
