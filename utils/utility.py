@@ -40,9 +40,9 @@ class checkpoint():
         if args.load == '':
             if args.save == '':
                 args.save = now
-            self.dir = '/Mydrive/LightMBN' + '/experiment/' + args.save
+            self.dir = '/gdrive/Mydrive/LightMBN' + '/experiment/' + args.save
         else:
-            self.dir = '/Mydrive/LightMBN' + '/experiment/' + args.load
+            self.dir = '/gdrive/Mydrive/LightMBN' + '/experiment/' + args.load
             if not os.path.exists(self.dir):
                 args.load = ''
             args.save = args.load
