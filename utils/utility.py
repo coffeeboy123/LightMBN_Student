@@ -36,7 +36,12 @@ class checkpoint():
         # print("root_path : ", ROOT_PATH)
         # ###### 주석 test
         #test
-
+        # Google Drive 사용 여부에 따라 ROOT_PATH 설정 (Google Colab 환경 가정)
+        if getattr(args, 'use_gdrive', False):
+            ROOT_PATH = '/content/drive/MyDrive'
+        else:
+            ROOT_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+            
         if args.load == '':
             if args.save == '':
                 args.save = now
