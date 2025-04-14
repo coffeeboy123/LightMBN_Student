@@ -47,19 +47,19 @@ class checkpoint():
                 args.load = ''
             args.save = args.load
 
-        if 'gdrive' in self.dir:
-            print('[WARNING] Google Drive path detected. Switching to local experiment folder.')
-            self.dir = os.path.join(ROOT_PATH, 'experiment', args.save)
+        #if 'gdrive' in self.dir:
+        #    print('[WARNING] Google Drive path detected. Switching to local experiment folder.')
+        #    self.dir = os.path.join(ROOT_PATH, 'experiment', args.save)
 
         ##### Only works when using google drive and colab #####
-        self.local_dir = None
+        #self.local_dir = None
         # if ROOT_PATH[:11] == '/content/dir':
 
  #       self.dir = osp.join('/content/gdrive/Mydrive/LightMBN',
  #                           self.dir[self.dir.find('experiment'):])
-        self.local_dir = ROOT_PATH + \
-            '/experiment/' + self.dir.split('/')[-1]
-        _make_dir(self.local_dir)
+        #self.local_dir = ROOT_PATH + \
+        #    '/experiment/' + self.dir.split('/')[-1]
+        #_make_dir(self.local_dir)
         ############################################
 
         _make_dir(self.dir)
@@ -92,16 +92,16 @@ class checkpoint():
 
         ###################################
 
-        with open(self.dir + '/config.yaml', open_type) as fp:
-            dic = vars(args).copy()
-            del dic['load'], dic['save'], dic['pre_train'], dic['test_only'], dic['re_rank'], dic['activation_map'], dic['nep_token']
-            yaml.dump(dic, fp, default_flow_style=False)
+        #with open(self.dir + '/config.yaml', open_type) as fp:
+        #    dic = vars(args).copy()
+        #    del dic['load'], dic['save'], dic['pre_train'], dic['test_only'], dic['re_rank'], dic['activation_map'], dic['nep_token']
+        #    yaml.dump(dic, fp, default_flow_style=False)
 
-        src_config = os.path.join(self.dir, 'config.yaml')
-        dst_config = os.path.join(self.local_dir, 'config.yaml') if self.local_dir is not None else None
+        #src_config = os.path.join(self.dir, 'config.yaml')
+        #dst_config = os.path.join(self.local_dir, 'config.yaml') if self.local_dir is not None else None
 
-        if dst_config is not None and os.path.abspath(src_config) != os.path.abspath(dst_config):
-            copyfile(src_config, dst_config)
+        #if dst_config is not None and os.path.abspath(src_config) != os.path.abspath(dst_config):
+        #    copyfile(src_config, dst_config)
 
     def add_log(self, log):
         self.log = torch.cat([self.log, log])
@@ -135,10 +135,10 @@ class checkpoint():
             self.log_file = open(self.dir + '/log.txt', 'a')
 
     # 안전하게 복사: src ≠ dst 일 때만
-            src_log = os.path.join(self.dir, 'log.txt')
-            dst_log = os.path.join(self.local_dir, 'log.txt') if self.local_dir is not None else None
-            if dst_log is not None and os.path.abspath(src_log) != os.path.abspath(dst_log):
-                copyfile(src_log, dst_log)
+            #src_log = os.path.join(self.dir, 'log.txt')
+            #dst_log = os.path.join(self.local_dir, 'log.txt') if self.local_dir is not None else None
+            #if dst_log is not None and os.path.abspath(src_log) != os.path.abspath(dst_log):
+            #    copyfile(src_log, dst_log)
 
 
     def done(self):
