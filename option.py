@@ -132,9 +132,6 @@ parser.add_argument('--reset', action='store_true', help='reset the training')
 parser.add_argument('--wandb', action='store_true', help='use wandb')
 parser.add_argument('--wandb_name', type=str, default='', help='wandb project name')
 
-parser.add_argument('--use_gdrive', action='store_true',
-                    help='if set, use Google Drive for saving experiment results')
-
 
 args = parser.parse_args()
 

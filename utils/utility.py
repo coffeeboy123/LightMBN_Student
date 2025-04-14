@@ -36,12 +36,7 @@ class checkpoint():
         # print("root_path : ", ROOT_PATH)
         # ###### 주석 test
         #test
-        # Google Drive 사용 여부에 따라 ROOT_PATH 설정 (Google Colab 환경 가정)
-        if getattr(args, 'use_gdrive', False):
-            ROOT_PATH = '/content/drive/MyDrive'
-        else:
-            ROOT_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
-            
+    
         if args.load == '':
             if args.save == '':
                 args.save = now
@@ -58,10 +53,10 @@ class checkpoint():
 
         ##### Only works when using google drive and colab #####
         self.local_dir = None
-        # if ROOT_PATH[:11] == '/content/dir':
+        if ROOT_PATH[:11] == '/content/dir':
+            self.dir = osp.join('/content/gdrive/Mydrive/LightMBN_log',
+            self.dir[self.dir.find('experiment'):])
 
- #       self.dir = osp.join('/content/gdrive/Mydrive/LightMBN',
- #                           self.dir[self.dir.find('experiment'):])
         self.local_dir = ROOT_PATH + \
             '/experiment/' + self.dir.split('/')[-1]
         _make_dir(self.local_dir)
@@ -107,6 +102,10 @@ class checkpoint():
 
         if dst_config is not None and os.path.abspath(src_config) != os.path.abspath(dst_config):
             copyfile(src_config, dst_config)
+
+        print("저장 경로:", self.dir)
+        print("로컬 경로:", self.local_dir)
+
 
     def add_log(self, log):
         self.log = torch.cat([self.log, log])
