@@ -50,7 +50,11 @@ class checkpoint():
 
         _make_dir(self.dir)
 
-        self.fold = 'B' if 'B' in args.datadir else 'A'
+        last_folder = os.path.basename(args.datadir.rstrip('/\\'))
+        if '_' in last_folder:
+            self.fold = last_folder.split('_')[-1].upper()
+        else:
+            self.fold = 'A'
         self.log_filename = f"{args.model}_{args.data_train}_{self.fold}_log.txt"
         self.map_log_filename = f"{args.model}_{args.data_train}_{self.fold}_map_log.pt"
         self.config_filename = f"{args.model}_{args.data_train}_{self.fold}_config.yaml"
