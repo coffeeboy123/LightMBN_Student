@@ -1,18 +1,17 @@
 import os
 import datetime
-
 import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 import torch
 import numpy as np
 import os.path as osp
-
 import yaml
 from collections import OrderedDict
-from shutil import copyfile, copytree
+from shutil import copyfile
 import pickle
 import warnings
+
 try:
     import neptune
 except Exception:
@@ -24,132 +23,108 @@ class checkpoint():
         self.args = args
         self.log = torch.Tensor()
         self.since = datetime.datetime.now()
-        now = datetime.datetime.now().strftime('%Y-%m-%d-%H:%M:%S')
+        now = datetime.datetime.now().strftime('%Y-%m-%d-%H-%M-%S')
 
         def _make_dir(path):
             if not os.path.exists(path):
                 os.makedirs(path)
 
-        ROOT_PATH = os.path.abspath(
-            os.path.join(os.path.dirname(__file__), '..'))
-        
-        # print("root_path : ", ROOT_PATH)
-        # ###### 주석 test
-        #test
-    
+        ROOT_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+
         if args.load == '':
             if args.save == '':
                 args.save = now
             self.dir = '/content/gdrive/MyDrive/LightMBN_Save' + '/experiment/' + args.save
         else:
-            self.dir = '/content/gdrive/MyDrive/LightMBN_Save' + '/experiment/' + args.load
+            self.dir = '/content/gdrive/MyDrive/LightMBN_Save' + '/experiment/' + args.save
             if not os.path.exists(self.dir):
                 args.load = ''
             args.save = args.load
 
-        #if 'gdrive' in self.dir:
-        #    print('[WARNING] Google Drive path detected. Switching to local experiment folder.')
-        #    self.dir = os.path.join(ROOT_PATH, 'experiment', args.save)
-
-        ##### Only works when using google drive and colab #####
-        #self.local_dir = None
-        # if ROOT_PATH[:11] == '/content/dir':
-
- #       self.dir = osp.join('/content/gdrive/Mydrive/LightMBN',
- #                           self.dir[self.dir.find('experiment'):])
-        #self.local_dir = ROOT_PATH + \
-        #    '/experiment/' + self.dir.split('/')[-1]
-        #_make_dir(self.local_dir)
-        ############################################
+        self.local_dir = None
+        if ROOT_PATH[:11] == '/content/dr':
+            self.dir = osp.join('/content/drive/Shareddrives/Colab',
+                                self.dir[self.dir.find('experiment'):])
+            self.local_dir = ROOT_PATH + '/experiment/' + self.dir.split('/')[-1]
+            _make_dir(self.local_dir)
 
         _make_dir(self.dir)
 
-        if os.path.exists(self.dir + '/map_log.pt'):
-            self.log = torch.load(self.dir + '/map_log.pt')
+        self.fold = 'B' if 'B' in args.datadir else 'A'
+        self.log_filename = f"{args.model}_{args.data_train}_{self.fold}_log.txt"
+        self.map_log_filename = f"{args.model}_{args.data_train}_{self.fold}_map_log.pt"
+        self.config_filename = f"{args.model}_{args.data_train}_{self.fold}_config.yaml"
+        self.model_latest_filename = f"{args.model}_{args.data_train}_{self.fold}_model-latest.pth"
+        self.model_best_filename = f"{args.model}_{args.data_train}_{self.fold}_model-best.pth"
 
-        print('Experiment results will be saved in {} '.format(self.dir))
+        map_log_path = os.path.join(self.dir, self.map_log_filename)
+        if os.path.exists(map_log_path):
+            self.log = torch.load(map_log_path)
 
-        open_type = 'a' if os.path.exists(self.dir + '/log.txt') else 'w'
-        self.log_file = open(self.dir + '/log.txt', open_type)
+        print(f'Experiment results will be saved in {self.dir}')
 
-        ######### For Neptune: ############
+        log_path = os.path.join(self.dir, self.log_filename)
+        open_type = 'a' if os.path.exists(log_path) else 'w'
+        self.log_file = open(log_path, open_type)
 
         try:
-            # replaced with your project name and token
             exp = neptune.init(args.nep_name, args.nep_token)
             if args.load == '':
                 self.exp = exp.create_experiment(name=self.dir.split('/')[-1],
-                                                 # tags=['keras', 'vis'],
-                                                 # upload_source_files=['**/*.py', 'parameters.yaml'],
                                                  params=vars(args))
                 args.nep_id = self.exp.id
             else:
                 self.exp = exp.get_experiments(id=args.nep_id)[0]
             print(self.exp.id)
-
         except Exception:
             pass
 
-        ###################################
+        config_path = os.path.join(self.dir, self.config_filename)
+        with open(config_path, open_type) as fp:
+            dic = vars(args).copy()
+            for k in ['load', 'save', 'pre_train', 'test_only', 're_rank', 'activation_map', 'nep_token']:
+                dic.pop(k, None)
+            yaml.dump(dic, fp, default_flow_style=False)
 
-        #with open(self.dir + '/config.yaml', open_type) as fp:
-        #    dic = vars(args).copy()
-        #    del dic['load'], dic['save'], dic['pre_train'], dic['test_only'], dic['re_rank'], dic['activation_map'], dic['nep_token']
-        #    yaml.dump(dic, fp, default_flow_style=False)
-
-        #src_config = os.path.join(self.dir, 'config.yaml')
-        #dst_config = os.path.join(self.local_dir, 'config.yaml') if self.local_dir is not None else None
-
-        #if dst_config is not None and os.path.abspath(src_config) != os.path.abspath(dst_config):
-        #    copyfile(src_config, dst_config)
+        if self.local_dir is not None:
+            copyfile(config_path, os.path.join(self.local_dir, self.config_filename))
 
     def add_log(self, log):
         self.log = torch.cat([self.log, log])
 
     def write_log(self, log, refresh=False, end='\n'):
         time_elapsed = (datetime.datetime.now() - self.since).seconds
-        log = log + ' Time used: {} m {} s'.format(
-            time_elapsed // 60, time_elapsed % 60)
+        log = log + f' Time used: {time_elapsed // 60} m {time_elapsed % 60} s'
         print(log, end=end)
         if end != '':
             self.log_file.write(log + end)
-
-            ######### For Neptune: ############
             try:
                 t = log.find('Total')
                 m = log.find('mAP')
                 r = log.find('rank1')
-
-                self.exp.log_metric('batch loss', float(
-                    log[t + 7:t + 12])) if t > -1 else None
-                self.exp.log_metric('mAP', float(
-                    log[m + 5:m + 11])) if m > -1 else None
-                self.exp.log_metric('rank1', float(
-                    log[r + 7:r + 13])) if r > -1 else None
+                self.exp.log_metric('batch loss', float(log[t + 7:t + 12])) if t > -1 else None
+                self.exp.log_metric('mAP', float(log[m + 5:m + 11])) if m > -1 else None
+                self.exp.log_metric('rank1', float(log[r + 7:r + 13])) if r > -1 else None
             except Exception:
                 pass
-            ###################################
 
         if refresh:
             self.log_file.close()
-            self.log_file = open(self.dir + '/log.txt', 'a')
-
-    # 안전하게 복사: src ≠ dst 일 때만
-            #src_log = os.path.join(self.dir, 'log.txt')
-            #dst_log = os.path.join(self.local_dir, 'log.txt') if self.local_dir is not None else None
-            #if dst_log is not None and os.path.abspath(src_log) != os.path.abspath(dst_log):
-            #    copyfile(src_log, dst_log)
-
+            self.log_file = open(os.path.join(self.dir, self.log_filename), 'a')
+            if self.local_dir is not None:
+                copyfile(os.path.join(self.dir, self.log_filename), os.path.join(self.local_dir, self.log_filename))
 
     def done(self):
         self.log_file.close()
 
     def plot_map_rank(self, epoch):
         axis = np.linspace(1, epoch, self.log.size(0))
-        label = 'Reid on {}'.format(self.args.data_test)
         labels = ['mAP', 'rank1', 'rank3', 'rank5', 'rank10']
         fig = plt.figure()
-        plt.title(label)
+
+        title = f'{self.args.model} on {self.args.data_test} ({self.fold}-fold)'
+        plt.title(title)
+
         for i in range(len(labels)):
             plt.plot(axis, self.log[:, i + 1].numpy(), label=labels[i])
 
@@ -157,127 +132,60 @@ class checkpoint():
         plt.xlabel('Epochs')
         plt.ylabel('mAP/rank')
         plt.grid(True)
-        plt.savefig('{}/result_{}.pdf'.format(self.dir,
-                                              self.args.data_test), dpi=600)
+
+        pdf_name = f'{self.args.model}_{self.args.data_test}_{self.fold}_result.pdf'
+        plt.savefig(os.path.join(self.dir, pdf_name), dpi=600)
         plt.close(fig)
 
-    def save_results(self, filename, save_list, scale):
-        pass
-
-    def save_checkpoint(
-        self, state, save_dir, is_best=False, remove_module_from_keys=False
-    ):
-        r"""Saves checkpoint.
-
-        Args:
-            state (dict): dictionary.
-            save_dir (str): directory to save checkpoint.
-            is_best (bool, optional): if True, this checkpoint will be copied and named
-                ``model-best.pth.tar``. Default is False.
-            remove_module_from_keys (bool, optional): whether to remove "module."
-                from layer names. Default is False.
-
-        Examples::
-            >>> state = {
-            >>>     'state_dict': model.state_dict(),
-            >>>     'epoch': 10,
-            >>>     'rank1': 0.5,
-            >>>     'optimizer': optimizer.state_dict()
-            >>> }
-            >>> save_checkpoint(state, 'log/my_model')
-        """
+    def save_checkpoint(self, state, save_dir, is_best=False, remove_module_from_keys=False):
         def mkdir_if_missing(dirname):
-            """Creates dirname if it is missing."""
             if not osp.exists(dirname):
-                try:
-                    os.makedirs(dirname)
-                except OSError as e:
-                    if e.errno != errno.EEXIST:
-                        raise
+                os.makedirs(dirname)
+
         mkdir_if_missing(save_dir)
         if remove_module_from_keys:
-            # remove 'module.' in state_dict's keys
             state_dict = state['state_dict']
-            new_state_dict = OrderedDict()
-            for k, v in state_dict.items():
-                if k.startswith('module.'):
-                    k = k[7:]
-                new_state_dict[k] = v
+            new_state_dict = OrderedDict((k[7:] if k.startswith('module.') else k, v)
+                                         for k, v in state_dict.items())
             state['state_dict'] = new_state_dict
-        # save
-        # fpath = osp.join(save_dir, 'model.pth.tar-' + str(epoch))
-        fpath = osp.join(save_dir, 'model-latest.pth')
-        torch.save(state, fpath)
-        self.write_log('[INFO] Checkpoint saved to "{}"'.format(fpath))
-        if is_best:
-            # shutil.copy(fpath, osp.join(osp.dirname(fpath), 'model-best.pth.tar'))
-            torch.save(state['state_dict'], osp.join(
-                save_dir, 'model-best.pth'))
-        if 'log' in state.keys():
 
-            torch.save(state['log'], os.path.join(save_dir, 'map_log.pt'))
+        torch.save(state, os.path.join(save_dir, self.model_latest_filename))
+        self.write_log(f'[INFO] Checkpoint saved to "{os.path.join(save_dir, self.model_latest_filename)}"')
+
+        if is_best:
+            torch.save(state['state_dict'], os.path.join(save_dir, self.model_best_filename))
+
+        if 'log' in state:
+            torch.save(state['log'], os.path.join(save_dir, self.map_log_filename))
 
     def load_checkpoint(self, fpath):
-        # """Loads checkpoint.
-        # ``UnicodeDecodeError`` can be well handled, which means
-        # python2-saved files can be read from python3.
-        # Args:
-        #     fpath (str): path to checkpoint.
-        # Returns:
-        #     dict
-        # Examples::
-        #     >>> from torchreid.utils import load_checkpoint
-        #     >>> fpath = 'log/my_model/model.pth.tar-10'
-        #     >>> checkpoint = load_checkpoint(fpath)
-        # """
         if fpath is None:
             raise ValueError('File path is None')
         if not osp.exists(fpath):
-            raise FileNotFoundError('File is not found at "{}"'.format(fpath))
+            raise FileNotFoundError(f'File is not found at "{fpath}"')
         map_location = None if torch.cuda.is_available() else 'cpu'
         try:
             checkpoint = torch.load(fpath, map_location=map_location)
         except UnicodeDecodeError:
             pickle.load = partial(pickle.load, encoding="latin1")
             pickle.Unpickler = partial(pickle.Unpickler, encoding="latin1")
-            checkpoint = torch.load(
-                fpath, pickle_module=pickle, map_location=map_location
-            )
+            checkpoint = torch.load(fpath, pickle_module=pickle, map_location=map_location)
         except Exception:
-            print('Unable to load checkpoint from "{}"'.format(fpath))
+            print(f'Unable to load checkpoint from "{fpath}"')
             raise
         return checkpoint
 
     def load_pretrained_weights(self, model, weight_path):
-        r"""Loads pretrianed weights to model.
-        Features::
-            - Incompatible layers (unmatched in name or size) will be ignored.
-            - Can automatically deal with keys containing "module.".
-        Args:
-            model (nn.Module): network model.
-            weight_path (str): path to pretrained weights.
-        Examples::
-            >>> from torchreid.utils import load_pretrained_weights
-            >>> weight_path = 'log/my_model/model-best.pth.tar'
-            >>> load_pretrained_weights(model, weight_path)
-        """
         checkpoint = self.load_checkpoint(weight_path)
-        if 'state_dict' in checkpoint:
-            state_dict = checkpoint['state_dict']
-        else:
-            state_dict = checkpoint
-
+        state_dict = checkpoint.get('state_dict', checkpoint)
         model_dict = model.state_dict()
         new_state_dict = OrderedDict()
         matched_layers, discarded_layers = [], []
+
         for k, v in state_dict.items():
-
-            if k.startswith('module.'):
-                k = 'model.' + k[7:]  # discard module.
-            if k.startswith('model.'):
-                k = k[6:]
+            k = k.replace('module.', '')
+            k = k.replace('model.', '')
             if k in model_dict and model_dict[k].size() == v.size():
-
                 new_state_dict[k] = v
                 matched_layers.append(k)
             else:
@@ -286,62 +194,34 @@ class checkpoint():
         model_dict.update(new_state_dict)
         model.load_state_dict(model_dict)
 
-        if len(matched_layers) == 0:
-            warnings.warn(
-                'The pretrained weights "{}" cannot be loaded, '
-                'please check the key names manually '
-                '(** ignored and continue **)'.format(weight_path)
-            )
+        if not matched_layers:
+            warnings.warn(f'No matched layers found in "{weight_path}"')
         else:
-            self.write_log('[INFO] Successfully loaded pretrained weights from "{}"'.
-                           format(weight_path))
-            if len(discarded_layers) > 0:
-                print(
-                    '** The following layers are discarded '
-                    'due to unmatched keys or layer size: {}'.
-                    format(discarded_layers)
-                )
+            self.write_log(f'[INFO] Successfully loaded pretrained weights from "{weight_path}"')
+            if discarded_layers:
+                print(f'Discarded layers: {discarded_layers}')
 
     def resume_from_checkpoint(self, fpath, model, optimizer=None, scheduler=None):
-        r"""Resumes training from a checkpoint.
-
-        This will load (1) model weights and (2) ``state_dict``
-        of optimizer if ``optimizer`` is not None.
-
-        Args:
-            fpath (str): path to checkpoint.
-            model (nn.Module): model.
-            optimizer (Optimizer, optional): an Optimizer.
-            scheduler (LRScheduler, optional): an LRScheduler.
-
-        Returns:
-            int: start_epoch.
-
-        Examples::
-            >>> from torchreid.utils import resume_from_checkpoint
-            >>> fpath = 'log/my_model/model.pth.tar-10'
-            >>> start_epoch = resume_from_checkpoint(
-            >>>     fpath, model, optimizer, scheduler
-            >>> )
-        """
-        self.write_log('[INFO] Loading checkpoint from "{}"'.format(fpath))
+        self.write_log(f'[INFO] Loading checkpoint from "{fpath}"')
         checkpoint = self.load_checkpoint(fpath)
-
-        # model.load_state_dict(checkpoint['state_dict'])
         self.load_pretrained_weights(model, fpath)
         self.write_log('[INFO] Model weights loaded')
-        if optimizer is not None and 'optimizer' in checkpoint.keys():
+
+        if optimizer and 'optimizer' in checkpoint:
             optimizer.load_state_dict(checkpoint['optimizer'])
             self.write_log('[INFO] Optimizer loaded')
-        if scheduler is not None and 'scheduler' in checkpoint.keys():
+
+        if scheduler and 'scheduler' in checkpoint:
             scheduler.load_state_dict(checkpoint['scheduler'])
             self.write_log('[INFO] Scheduler loaded')
+
         start_epoch = checkpoint['epoch']
-        self.write_log('[INFO] Last epoch = {}'.format(start_epoch))
-        if 'rank1' in checkpoint.keys():
-            self.write_log(
-                '[INFO] Last rank1 = {:.1%}'.format(checkpoint['rank1']))
-        if 'log' in checkpoint.keys():
+        self.write_log(f'[INFO] Last epoch = {start_epoch}')
+
+        if 'rank1' in checkpoint:
+            self.write_log(f'[INFO] Last rank1 = {checkpoint["rank1"]:.1%}')
+
+        if 'log' in checkpoint:
             self.log = checkpoint['log']
 
         return start_epoch, model, optimizer
