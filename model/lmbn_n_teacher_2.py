@@ -42,13 +42,13 @@ class LMBN_n_teacher_2(nn.Module):
         self.reduction_3 = copy.deepcopy(reduction)
         self.reduction_4 = copy.deepcopy(reduction)
 
-        self.ch0_poinwise = nn.Sequential(nn.Conv2d(
+        self.ch0_pointwise = nn.Sequential(nn.Conv2d(
             self.chs, args.feats, 1, bias=False), nn.BatchNorm2d(args.feats), nn.ReLU(True))
-        self.weights_init_kaiming(self.ch0_poinwise)
+        self.weights_init_kaiming(self.ch0_pointwise)
 
-        self.ch1_poinwise = nn.Sequential(nn.Conv2d(
+        self.ch1_pointwise = nn.Sequential(nn.Conv2d(
             self.chs, args.feats, 1, bias=False), nn.BatchNorm2d(args.feats), nn.ReLU(True))
-        self.weights_init_kaiming(self.ch1_poinwise)
+        self.weights_init_kaiming(self.ch1_pointwise)
 
         self.reduction_ch_0 = BNNeck(
             args.feats, args.num_classes, return_f=True)
