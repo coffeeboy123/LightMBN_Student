@@ -116,13 +116,13 @@ class Engine:
         self.ckpt.log[-1, 3] = r[2]
         self.ckpt.log[-1, 4] = r[4]
         self.ckpt.log[-1, 5] = r[9]
-        best = self.ckpt.log.max(0)
+        best = self.ckpt.log[:, 2].max(0)  # rank1 기준
 
         self.ckpt.write_log(
-            "[INFO] mAP: {:.4f} rank1: {:.4f} rank3: {:.4f} rank5: {:.4f} rank10: {:.4f} (Best: {:.4f} @epoch {})".format(
-                m_ap, r[0], r[2], r[4], r[9], best[0][1], self.ckpt.log[best[1][1], 0]
+            "[INFO] mAP: {:.4f} rank1: {:.4f} rank3: {:.4f} rank5: {:.4f} rank10: {:.4f} (Best rank1: {:.4f} @epoch {})".format(
+                m_ap, r[0], r[2], r[4], r[9], best.values.item(), self.ckpt.log[best.indices.item(), 0].item()
             ),
-            refresh=True,
+        refresh=True,
         )
 
         if not self.args.test_only:
@@ -130,9 +130,8 @@ class Engine:
                 epoch,
                 r[0],
                 self.ckpt.dir,
-                is_best=(self.ckpt.log[best[1][1], 0] == epoch),
+                is_best=(self.ckpt.log[best.indices.item(), 0] == epoch),
             )
-            self.ckpt.plot_map_rank(epoch)
 
         if self.wandb is True and wandb is not None:
             wandb.log(
