@@ -118,11 +118,15 @@ class Engine:
         self.ckpt.log[-1, 5] = r[9]
         best = self.ckpt.log[:, 2].max(0)  # rank1 기준
 
+        best_rank1_value = best.values.item()
+        best_rank1_epoch = int(self.ckpt.log[best.indices.item(), 0].item())
+
         self.ckpt.write_log(
-            "[INFO] mAP: {:.4f} rank1: {:.4f} rank3: {:.4f} rank5: {:.4f} rank10: {:.4f} (Best rank1: {:.4f} @epoch {})".format(
-                m_ap, r[0], r[2], r[4], r[9], best.values.item(), self.ckpt.log[best.indices.item(), 0].item()
+            "[INFO] mAP: {:.4f} | rank1: {:.4f} | rank3: {:.4f} | rank5: {:.4f} | rank10: {:.4f} "
+            "(Best rank1: {:.4f} @epoch {})".format(
+                m_ap, r[0], r[2], r[4], r[9], best_rank1_value, best_rank1_epoch
             ),
-        refresh=True,
+            refresh=True,
         )
 
         if not self.args.test_only:
