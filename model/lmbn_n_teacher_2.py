@@ -119,7 +119,7 @@ class LMBN_n_teacher_2(nn.Module):
 
         ################
 
-        fea = [f_glo[-1], f_glo_drop[-1], f_p0[-1]]
+        fea = [f_glo[-1], f_glo_drop[-1], f_p0[-1], f_p1[-1], f_p2[-1], f_c0[-1], f_c1[-1]]
 
         if not self.training:
 
