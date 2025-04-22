@@ -112,19 +112,28 @@ class Engine:
         self.ckpt.log[-1, 4] = r[4]
         self.ckpt.log[-1, 5] = r[9]
 
-        best_rank1 = self.ckpt.log[:, 2].max(0)
-        best_idx = best_rank1.indices.item()
+        # ✅ 이전 기록만으로 best rank1/mAP 확인
+        previous_log = self.ckpt.log[:-1, :]  # exclude current test log
 
-        best_rank1_value = self.ckpt.log[best_idx, 2].item()
-        best_map_value = self.ckpt.log[best_idx, 1].item()
-        best_epoch = int(self.ckpt.log[best_idx, 0].item())
+        if previous_log.shape[0] > 0:
+            best_rank1 = previous_log[:, 2].max(0)
+            best_idx = best_rank1.indices.item()
+            best_rank1_value = previous_log[best_idx, 2].item()
+            best_map_value = previous_log[best_idx, 1].item()
+            best_epoch = int(previous_log[best_idx, 0].item())
+        else:
+            best_rank1_value = 0
+            best_map_value = 0
+            best_epoch = -1
 
+        # ✅ best 조건 판별
         is_best = False
         if r[0] > best_rank1_value:
             is_best = True
         elif r[0] == best_rank1_value and m_ap > best_map_value:
             is_best = True
 
+        # ✅ 현재 에포크가 best면 로그 정보도 갱신
         if is_best:
             best_rank1_value = r[0]
             best_map_value = m_ap
@@ -156,6 +165,7 @@ class Engine:
                     "rank10": r[9],
                 }
             )
+
 
 
     def fliphor(self, inputs):
