@@ -113,14 +113,14 @@ class Engine:
         self.ckpt.log[-1, 5] = r[9]
 
         # ✅ 이전 기록만으로 best rank1/mAP 확인
-        previous_log = self.ckpt.log[:-1, :]  # exclude current test log
-
+        previous_log = self.ckpt.log[:-1, :]  # exclude current
         if previous_log.shape[0] > 0:
-            best_rank1 = previous_log[:, 2].max(0)
-            best_idx = best_rank1.indices.item()
-            best_rank1_value = previous_log[best_idx, 2].item()
-            best_map_value = previous_log[best_idx, 1].item()
-            best_epoch = int(previous_log[best_idx, 0].item())
+            # 최대 rank1을 가지는 모든 인덱스 추출
+            best_rank1_value = previous_log[:, 2].max().item()
+            rank1_mask = previous_log[:, 2] == best_rank1_value
+            best_map_value = previous_log[rank1_mask, 1].max().item()
+
+            best_epoch = int(previous_log[(rank1_mask) & (previous_log[:, 1] == best_map_value), 0][0].item())
         else:
             best_rank1_value = 0
             best_map_value = 0
