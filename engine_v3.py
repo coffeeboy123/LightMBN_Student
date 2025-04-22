@@ -112,20 +112,23 @@ class Engine:
         self.ckpt.log[-1, 4] = r[4]
         self.ckpt.log[-1, 5] = r[9]
 
-        # Get current best rank1 value
-        best_rank1_value = self.ckpt.log[:, 2].max().item()
+        best_rank1 = self.ckpt.log[:, 2].max(0)
+        best_idx = best_rank1.indices.item()
 
-        # Get indices where rank1 is equal to best_rank1_value
-        same_rank1_mask = self.ckpt.log[:, 2] == best_rank1_value
-        map_values = self.ckpt.log[same_rank1_mask, 1]
-        best_map_idx_in_mask = torch.argmax(map_values).item()
-        best_idx = torch.arange(len(self.ckpt.log))[same_rank1_mask][best_map_idx_in_mask].item()
-
+        best_rank1_value = self.ckpt.log[best_idx, 2].item()
         best_map_value = self.ckpt.log[best_idx, 1].item()
         best_epoch = int(self.ckpt.log[best_idx, 0].item())
 
-        is_best = (r[0] > best_rank1_value) or (r[0] == best_rank1_value and m_ap > best_map_value)
+        is_best = False
+        if r[0] > best_rank1_value:
+            is_best = True
+        elif r[0] == best_rank1_value and m_ap > best_map_value:
+            is_best = True
 
+        if is_best:
+            best_rank1_value = r[0]
+            best_map_value = m_ap
+            best_epoch = epoch
 
         self.ckpt.write_log(
             "[INFO] mAP: {:.4f} | rank1: {:.4f} | rank3: {:.4f} | rank5: {:.4f} | rank10: {:.4f} "
