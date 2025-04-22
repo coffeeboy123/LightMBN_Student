@@ -99,13 +99,8 @@ class Engine:
             )
 
         if self.args.re_rank:
-            # q_g_dist = np.dot(qf, np.transpose(gf))
-            # q_q_dist = np.dot(qf, np.transpose(qf))
-            # g_g_dist = np.dot(gf, np.transpose(gf))
-            # dist = re_ranking(q_g_dist, q_q_dist, g_g_dist)
             dist = re_ranking_gpu(qf, gf, 20, 6, 0.3)
         else:
-            # cosine distance
             dist = 1 - torch.mm(qf, gf.t()).cpu().numpy()
 
         r, m_ap = evaluation(dist, query_ids, gallery_ids, query_cams, gallery_cams, 50)
@@ -116,15 +111,24 @@ class Engine:
         self.ckpt.log[-1, 3] = r[2]
         self.ckpt.log[-1, 4] = r[4]
         self.ckpt.log[-1, 5] = r[9]
-        best = self.ckpt.log[:, 2].max(0)  # rank1 기준
 
-        best_rank1_value = best.values.item()
-        best_rank1_epoch = int(self.ckpt.log[best.indices.item(), 0].item())
+        best_rank1 = self.ckpt.log[:, 2].max(0)
+        best_idx = best_rank1.indices.item()
+
+        best_rank1_value = self.ckpt.log[best_idx, 2].item()
+        best_map_value = self.ckpt.log[best_idx, 1].item()
+        best_epoch = int(self.ckpt.log[best_idx, 0].item())
+
+        is_best = False
+        if r[0] > best_rank1_value:
+            is_best = True
+        elif r[0] == best_rank1_value and m_ap > best_map_value:
+            is_best = True
 
         self.ckpt.write_log(
             "[INFO] mAP: {:.4f} | rank1: {:.4f} | rank3: {:.4f} | rank5: {:.4f} | rank10: {:.4f} "
             "(Best rank1: {:.4f} @epoch {})".format(
-                m_ap, r[0], r[2], r[4], r[9], best_rank1_value, best_rank1_epoch
+                m_ap, r[0], r[2], r[4], r[9], best_rank1_value, best_epoch
             ),
             refresh=True,
         )
@@ -134,7 +138,7 @@ class Engine:
                 epoch,
                 r[0],
                 self.ckpt.dir,
-                is_best=(self.ckpt.log[best.indices.item(), 0] == epoch),
+                is_best=is_best,
             )
 
         if self.wandb is True and wandb is not None:
@@ -147,6 +151,7 @@ class Engine:
                     "rank10": r[9],
                 }
             )
+
 
     def fliphor(self, inputs):
         inv_idx = torch.arange(inputs.size(3) - 1, -1, -1).long()  # N x C x H x W
