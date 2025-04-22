@@ -124,13 +124,8 @@ class Engine:
         best_map_value = self.ckpt.log[best_idx, 1].item()
         best_epoch = int(self.ckpt.log[best_idx, 0].item())
 
-        is_best = (epoch == best_epoch)
+        is_best = (r[0] > best_rank1_value) or (r[0] == best_rank1_value and m_ap > best_map_value)
 
-        is_best = False
-        if r[0] > best_rank1_value:
-            is_best = True
-        elif r[0] == best_rank1_value and m_ap > best_map_value:
-            is_best = True
 
         self.ckpt.write_log(
             "[INFO] mAP: {:.4f} | rank1: {:.4f} | rank3: {:.4f} | rank5: {:.4f} | rank10: {:.4f} "
