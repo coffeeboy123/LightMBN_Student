@@ -166,8 +166,6 @@ class Engine:
                 }
             )
 
-
-
     def fliphor(self, inputs):
         inv_idx = torch.arange(inputs.size(3) - 1, -1, -1).long()  # N x C x H x W
         return inputs.index_select(3, inv_idx)
