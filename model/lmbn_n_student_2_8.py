@@ -20,8 +20,8 @@ class LMBN_n_student_2_8(nn.Module):
 
         self.backone = nn.Sequential(
             osnet.conv1,
+            osnet.maxpool,
             osnet.conv2,
-            osnet.maxpool
         )
 
         self.global_branch = nn.Sequential(copy.deepcopy(osnet.conv3),
