@@ -152,3 +152,52 @@ class ClassBlock(nn.Module):
             nn.init.normal_(m.weight.data, std=0.001)
             nn.init.constant_(m.bias.data, 0.0)
 
+class BNNeck3_depthwise(nn.Module):
+    def __init__(self, input_dim, class_num, feat_dim, return_f=False):
+        super(BNNeck3_depthwise, self).__init__()
+        self.return_f = return_f
+        # self.reduction = nn.Linear(input_dim, feat_dim)
+        # self.bn = nn.BatchNorm1d(feat_dim)
+
+        self.reduction = nn.Conv2d(
+            input_dim, feat_dim, 1, bias=False, groups=feat_dim)
+        self.bn = nn.BatchNorm1d(feat_dim)
+
+        self.bn.bias.requires_grad_(False)
+        self.classifier = nn.Linear(feat_dim, class_num, bias=False)
+        self.bn.apply(self.weights_init_kaiming)
+        self.classifier.apply(self.weights_init_classifier)
+
+    def forward(self, x):
+        x = self.reduction(x)
+        # before_neck = x.squeeze(dim=3).squeeze(dim=2)
+        # after_neck = self.bn(x).squeeze(dim=3).squeeze(dim=2)
+        before_neck = x.view(x.size(0), x.size(1))
+        after_neck = self.bn(before_neck)
+        if self.return_f:
+            score = self.classifier(after_neck)
+            return after_neck, score, before_neck
+        else:
+            x = self.classifier(x)
+            return x
+
+    def weights_init_kaiming(self, m):
+        classname = m.__class__.__name__
+        if classname.find('Linear') != -1:
+            nn.init.kaiming_normal_(m.weight, a=0, mode='fan_out')
+            nn.init.constant_(m.bias, 0.0)
+        elif classname.find('Conv') != -1:
+            nn.init.kaiming_normal_(m.weight, a=0, mode='fan_in')
+            if m.bias is not None:
+                nn.init.constant_(m.bias, 0.0)
+        elif classname.find('BatchNorm') != -1:
+            if m.affine:
+                nn.init.constant_(m.weight, 1.0)
+                nn.init.constant_(m.bias, 0.0)
+
+    def weights_init_classifier(self, m):
+        classname = m.__class__.__name__
+        if classname.find('Linear') != -1:
+            nn.init.normal_(m.weight, std=0.001)
+            if m.bias:
+                nn.init.constant_(m.bias, 0.0)
