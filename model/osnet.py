@@ -8,6 +8,7 @@ from torch import nn
 from torch.nn import functional as F
 import torchvision
 
+
 pretrained_urls = {
     'osnet_x1_0': 'https://drive.google.com/uc?id=1LaG1EJpHrxdAxKnSCJ_i0u-nbxSAeiFY',
     'osnet_x0_75': 'https://drive.google.com/uc?id=1uwA9fElHOk3ZogwbeY5GkLI6QPTX70Hq',
@@ -121,12 +122,12 @@ class ChannelGate(nn.Module):
             num_gates = in_channels
         self.return_gates = return_gates
         self.global_avgpool = nn.AdaptiveAvgPool2d(1)
-        self.fc1 = nn.Conv2d(in_channels, in_channels // reduction, kernel_size=1, bias=True, padding=0)
+        self.fc1 = nn.Conv2d(in_channels, in_channels//reduction, kernel_size=1, bias=True, padding=0)
         self.norm1 = None
         if layer_norm:
-            self.norm1 = nn.LayerNorm((in_channels // reduction, 1, 1))
+            self.norm1 = nn.LayerNorm((in_channels//reduction, 1, 1))
         self.relu = nn.ReLU(inplace=True)
-        self.fc2 = nn.Conv2d(in_channels // reduction, num_gates, kernel_size=1, bias=True, padding=0)
+        self.fc2 = nn.Conv2d(in_channels//reduction, num_gates, kernel_size=1, bias=True, padding=0)
         if gate_activation == 'sigmoid':
             self.gate_activation = nn.Sigmoid()
         elif gate_activation == 'relu':
@@ -250,7 +251,7 @@ class OSNet(nn.Module):
         return nn.Sequential(*layers)
 
     def _construct_fc_layer(self, fc_dims, input_dim, dropout_p=None):
-        if fc_dims is None or fc_dims < 0:
+        if fc_dims is None or fc_dims<0:
             self.feature_dim = input_dim
             return None
 
@@ -318,7 +319,7 @@ class OSNet(nn.Module):
             raise KeyError("Unsupported loss: {}".format(self.loss))
 
 
-def init_pretrained_weights(model, key='', strict=True):
+def init_pretrained_weights(model, key=''):
     """Initializes model with pretrained weights.
 
     Layers that don't match with pretrained layers in name or size are kept unchanged.
@@ -361,7 +362,7 @@ def init_pretrained_weights(model, key='', strict=True):
 
     for k, v in state_dict.items():
         if k.startswith('module.'):
-            k = k[7:]  # discard module.
+            k = k[7:] # discard module.
 
         if k in model_dict and model_dict[k].size() == v.size():
             new_state_dict[k] = v
@@ -370,7 +371,7 @@ def init_pretrained_weights(model, key='', strict=True):
             discarded_layers.append(k)
 
     model_dict.update(new_state_dict)
-    model.load_state_dict(model_dict, strict=strict)
+    model.load_state_dict(model_dict)
 
     if len(matched_layers) == 0:
         warnings.warn(
@@ -394,13 +395,12 @@ def osnet_x1_25(num_classes=1000, pretrained=True, loss='softmax', **kwargs):
     if pretrained:
         init_pretrained_weights(model, key='osnet_x1_25')
 
-
 def osnet_x1_0(num_classes=1000, pretrained=True, loss='softmax', **kwargs):
     # standard size (width x1.0)
     model = OSNet(num_classes, blocks=[OSBlock, OSBlock, OSBlock], layers=[2, 2, 2],
                   channels=[64, 256, 384, 512], loss=loss, **kwargs)
     if pretrained:
-        init_pretrained_weights(model, key='osnet_x1_0', strict=False)
+        init_pretrained_weights(model, key='osnet_x1_0')
     return model
 
 
@@ -424,10 +424,10 @@ def osnet_x0_5(num_classes=1000, pretrained=True, loss='softmax', **kwargs):
 
 def osnet_x0_25(num_classes=1000, pretrained=True, loss='softmax', **kwargs):
     # very tiny size (width x0.25)
-    model = OSNet(num_classes, blocks=[OSBlock, OSBlock], layers=[1, 1],
+    model = OSNet(num_classes, blocks=[OSBlock, OSBlock, OSBlock], layers=[1, 1, 1],
                   channels=[16, 64, 128, 256], loss=loss, **kwargs)
     if pretrained:
-        init_pretrained_weights(model, key='osnet_x0_25', strict=False)
+        init_pretrained_weights(model, key='osnet_x0_25')
     return model
 
 
@@ -439,44 +439,3 @@ def osnet_ibn_x1_0(num_classes=1000, pretrained=True, loss='softmax', **kwargs):
     if pretrained:
         init_pretrained_weights(model, key='osnet_ibn_x1_0')
     return model
-
-def osnet_student(num_classes=1000, pretrained=False, loss='softmax', **kwargs):
-    class OSNetStudent(nn.Module):
-        def __init__(self):
-            super(OSNetStudent, self).__init__()
-            self.loss = loss
-            self.conv1 = ConvLayer(3, 16, 7, stride=2, padding=3)
-            self.maxpool = nn.MaxPool2d(3, stride=2, padding=1)
-
-            # OSBlock 2개로 구성
-            self.conv2 = OSBlock(16, 64)
-            self.conv3 = OSBlock(64, 128)
-
-            self.conv5 = Conv1x1(128, 512)
-            self.global_avgpool = nn.AdaptiveAvgPool2d(1)
-            self.fc = nn.Sequential(
-                nn.Linear(512, 512),
-                nn.BatchNorm1d(512),
-                nn.ReLU(inplace=True)
-            )
-            self.classifier = nn.Linear(512, num_classes)
-
-        def forward(self, x, return_featuremaps=False):
-            x = self.conv1(x)
-            x = self.maxpool(x)
-            x = self.conv2(x)
-            x = self.conv3(x)
-            x = self.conv5(x)
-            if return_featuremaps:
-                return x
-            v = self.global_avgpool(x).view(x.size(0), -1)
-            v = self.fc(v)
-            if not self.training:
-                return v
-            y = self.classifier(v)
-            if self.loss == 'softmax':
-                return y
-            elif self.loss == 'triplet':
-                return y, v
-            else:
-                raise KeyError(f"Unsupported loss: {self.loss}")
