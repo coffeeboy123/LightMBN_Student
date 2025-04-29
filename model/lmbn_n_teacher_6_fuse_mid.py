@@ -9,9 +9,9 @@ from torch.nn import functional as F
 from torch.autograd import Variable
 
 
-class LMBN_n_teacher_6_fuse_mid(nn.Module):
+class LMBN_n_teacher_6_fuse(nn.Module):
     def __init__(self, args):
-        super(LMBN_n_teacher_6_fuse_mid, self).__init__()
+        super(LMBN_n_teacher_6_fuse, self).__init__()
 
         self.n_ch = 2
         self.chs = 512 // self.n_ch
@@ -35,35 +35,35 @@ class LMBN_n_teacher_6_fuse_mid(nn.Module):
         self.channel_branch_fin = nn.Sequential(copy.deepcopy(conv3), copy.deepcopy(osnet.conv4), copy.deepcopy(osnet.conv5))
 
         self.fusion_conv = nn.Sequential(
-            nn.Conv2d(512 * 3, 512 * 3, kernel_size=1, bias=False),  # 3개를 concat하니까 채널은 512*3
-            nn.BatchNorm2d(512 * 3),
+            nn.Conv2d(384 * 3, 384 * 3, kernel_size=1, bias=False),  # 3개를 concat하니까 채널은 512*3
+            nn.BatchNorm2d(384 * 3),
             nn.ReLU(inplace=True)
         )
 
         self.global_gate = nn.Sequential(
             nn.AdaptiveAvgPool2d(1),  # Global descriptor
-            nn.Conv2d(1536, 512, 1, bias=False),  # Reduce to 512
-            nn.BatchNorm2d(512),
+            nn.Conv2d(384 * 3, 384, 1, bias=False),  # Reduce to 512
+            nn.BatchNorm2d(384),
             nn.ReLU(inplace=True),
-            nn.Conv2d(512, 1536, 1, bias=False),
+            nn.Conv2d(384, 384 * 3, 1, bias=False),
             nn.Sigmoid()
         )
 
         self.partial_gate = nn.Sequential(
             nn.AdaptiveAvgPool2d(1),  # Global descriptor
-            nn.Conv2d(1536, 512, 1, bias=False),  # Reduce to 512
-            nn.BatchNorm2d(512),
+            nn.Conv2d(384 * 3, 384, 1, bias=False),  # Reduce to 512
+            nn.BatchNorm2d(384),
             nn.ReLU(inplace=True),
-            nn.Conv2d(512, 1536, 1, bias=False),
+            nn.Conv2d(384, 384 * 3, 1, bias=False),
             nn.Sigmoid()
         )
 
         self.channel_gate = nn.Sequential(
             nn.AdaptiveAvgPool2d(1),  # Global descriptor
-            nn.Conv2d(1536, 512, 1, bias=False),  # Reduce to 512
-            nn.BatchNorm2d(512),
+            nn.Conv2d(384 * 3, 384, 1, bias=False),  # Reduce to 512
+            nn.BatchNorm2d(384),
             nn.ReLU(inplace=True),
-            nn.Conv2d(512, 1536, 1, bias=False),
+            nn.Conv2d(384, 384 * 3, 1, bias=False),
             nn.Sigmoid()
         )
 
@@ -119,9 +119,9 @@ class LMBN_n_teacher_6_fuse_mid(nn.Module):
         fusion_att_cha = fusion * self.channel_gate(fusion)
 
         # 4. split
-        glo_fin = fusion_att_glo[:, :512, :, :]
-        par_fin = fusion_att_par[:, 512:1024, :, :]
-        cha_fin = fusion_att_cha[:, 1024:, :, :]
+        glo_fin = fusion_att_glo[:, :384, :, :]
+        par_fin = fusion_att_par[:, 384:384*2, :, :]
+        cha_fin = fusion_att_cha[:, 384*2:, :, :]
 
         glo = self.global_branch_fin(glo_fin)
         par = self.partial_branch_fin(par_fin)
