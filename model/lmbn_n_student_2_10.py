@@ -30,10 +30,14 @@ class LMBN_n_student_2_10(nn.Module):
                                            nn.ReLU(inplace=True))
 
         self.partial_branch = nn.Sequential(copy.deepcopy(osnet.conv3), copy.deepcopy(osnet.conv4),
-                                            LightConv3x3(256, 512))
+                                           nn.Conv2d(256, 512, kernel_size=1, bias=False),  # groups=128
+                                           nn.BatchNorm2d(512),
+                                           nn.ReLU(inplace=True))
 
         self.channel_branch = nn.Sequential(copy.deepcopy(osnet.conv3), copy.deepcopy(osnet.conv4),
-                                            LightConv3x3(256, 512))
+                                           nn.Conv2d(256, 512, kernel_size=1, bias=False),  # groups=128
+                                           nn.BatchNorm2d(512),
+                                           nn.ReLU(inplace=True))
 
         self.global_pooling = nn.AdaptiveAvgPool2d((1, 1))
         self.partial_pooling = nn.AdaptiveAvgPool2d((2, 1))
