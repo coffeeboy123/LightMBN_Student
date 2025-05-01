@@ -25,7 +25,7 @@ class LMBN_n_student_2_11(nn.Module):
         )
 
         self.global_branch = nn.Sequential(copy.deepcopy(osnet.conv3), copy.deepcopy(osnet.conv4),
-                                           nn.Conv2d(256, 512, kernel_size=1, groups=256, False),  # groups=128
+                                           nn.Conv2d(256, 512, kernel_size=1, groups=256, bias=False),  # groups=128
                                            nn.BatchNorm2d(512),
                                            nn.ReLU(inplace=True))
 
