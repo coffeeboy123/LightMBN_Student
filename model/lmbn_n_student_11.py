@@ -51,7 +51,7 @@ class LMBN_n_student_11(nn.Module):
                                            nn.ReLU(inplace=True)
                                            )
 
-        self.channel_branch = nnn.Sequential(nn.Conv2d(32, 64, kernel_size=3, padding=1, groups=32, bias=False),
+        self.channel_branch = nn.Sequential(nn.Conv2d(32, 64, kernel_size=3, padding=1, groups=32, bias=False),
                                            nn.BatchNorm2d(64),
                                            nn.ReLU(inplace=True),
                                            nn.AvgPool2d(2, stride=2),
