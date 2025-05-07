@@ -55,11 +55,11 @@ class checkpoint():
             self.fold = last_folder.split('_')[-1].upper()
         else:
             self.fold = 'A'
-        self.log_filename = f"{args.model}_{args.data_train}_{self.fold}_log.txt"
-        self.map_log_filename = f"{args.model}_{args.data_train}_{self.fold}_map_log.pt"
-        self.config_filename = f"{args.model}_{args.data_train}_{self.fold}_config.yaml"
-        self.model_latest_filename = f"{args.model}_{args.data_train}_{self.fold}_model-latest.pth"
-        self.model_best_filename = f"{args.model}_{args.data_train}_{self.fold}_model-best.pth"
+        self.log_filename = f"{args.model}_{args.data_train}_{self.fold}_{args.batchid}_{args.batchimage}_{args.batchtest}_log.txt"
+        self.map_log_filename = f"{args.model}_{args.data_train}_{self.fold}_{args.batchid}_{args.batchimage}_{args.batchtest}_map_log.pt"
+        self.config_filename = f"{args.model}_{args.data_train}_{self.fold}_{args.batchid}_{args.batchimage}_{args.batchtest}_config.yaml"
+        self.model_latest_filename = f"{args.model}_{args.data_train}_{self.fold}_{args.batchid}_{args.batchimage}_{args.batchtest}_model-latest.pth"
+        self.model_best_filename = f"{args.model}_{args.data_train}_{self.fold}_{args.batchid}_{args.batchimage}_{args.batchtest}_model-best.pth"
 
         map_log_path = os.path.join(self.dir, self.map_log_filename)
         if os.path.exists(map_log_path):

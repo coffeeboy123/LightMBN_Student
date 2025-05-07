@@ -16,7 +16,7 @@ class LMBN_n_student_10(nn.Module):
         self.n_ch = 2
         self.chs = 512 // self.n_ch
 
-        osnet = osnet_x0(pretrained=True)
+        osnet = osnet_x0_25(pretrained=True)
 
         self.backone = nn.Sequential(
             osnet.conv1,
@@ -25,18 +25,18 @@ class LMBN_n_student_10(nn.Module):
         )
 
         self.global_branch = nn.Sequential(copy.deepcopy(osnet.conv3), 
-                                           nn.Conv2d(96, 512, kernel_size=1, bias=False),  # groups=128
+                                           nn.Conv2d(128, 512, kernel_size=1, bias=False),  # groups=128
                                            nn.BatchNorm2d(512),
                                            nn.ReLU(inplace=True))
 
 
         self.partial_branch = nn.Sequential(copy.deepcopy(osnet.conv3), 
-                                           nn.Conv2d(96, 512, kernel_size=1, bias=False),  # groups=128
+                                           nn.Conv2d(128, 512, kernel_size=1, bias=False),  # groups=128
                                            nn.BatchNorm2d(512),
                                            nn.ReLU(inplace=True))
 
         self.channel_branch = nn.Sequential(copy.deepcopy(osnet.conv3), 
-                                           nn.Conv2d(96, 512, kernel_size=1, bias=False),  # groups=128
+                                           nn.Conv2d(128, 512, kernel_size=1, bias=False),  # groups=128
                                            nn.BatchNorm2d(512),
                                            nn.ReLU(inplace=True))
 
