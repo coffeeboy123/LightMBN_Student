@@ -73,7 +73,7 @@ class LMBN_n_teacher_6_fake_quant_data(nn.Module):
     def forward(self, x):
         # if self.batch_drop_block is not None:
         #     x = self.batch_drop_block(x)
-
+        x = self.quant(x)
 
         glo = self.global_branch(x)
         par = self.partial_branch(x)
