@@ -131,6 +131,13 @@ parser.add_argument('--reset', action='store_true', help='reset the training')
 # for wandb
 parser.add_argument('--wandb', action='store_true', help='use wandb')
 parser.add_argument('--wandb_name', type=str, default='', help='wandb project name')
+parser.add_argument(
+    '--seed',
+    type=int,
+    default=251,
+    help='random seed for reproducibility (default: 42)'
+)
+
 
 
 args = parser.parse_args()
