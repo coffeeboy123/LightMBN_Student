@@ -8,7 +8,7 @@ import numpy as np
 import os.path as osp
 import yaml
 from collections import OrderedDict
-from shutil import copyfiles
+from shutil import copyfile
 import pickle
 import warnings
 
