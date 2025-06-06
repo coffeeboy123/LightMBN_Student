@@ -47,7 +47,9 @@ def evaluate_py(distmat, q_pids, g_pids, q_camids, g_camids, max_rank):
 
         # remove gallery samples that have the same pid and camid with query
         order = indices[q_idx]
-        keep = np.ones_like(g_pids[order], dtype=bool)
+        remove = (g_pids[order] == q_pid) & (g_camids[order] == q_camid)
+        keep = np.invert(remove)
+
         # compute cmc curve
         # binary vector, positions with value 1 are correct matches
         raw_cmc = matches[q_idx][keep]
@@ -131,21 +133,33 @@ def cmc(distmat, query_ids=None, gallery_ids=None,
         single_gallery_shot=False,
         first_match_break=False):
     m, n = distmat.shape
+    # Fill up default values
     if query_ids is None:
         query_ids = np.arange(m)
     if gallery_ids is None:
         gallery_ids = np.arange(n)
-
+    if query_cams is None:
+        query_cams = np.zeros(m).astype(np.int32)
+    if gallery_cams is None:
+        gallery_cams = np.ones(n).astype(np.int32)
+    # Ensure numpy array
     query_ids = np.asarray(query_ids)
     gallery_ids = np.asarray(gallery_ids)
-
+    query_cams = np.asarray(query_cams)
+    gallery_cams = np.asarray(gallery_cams)
+    # Sort and find correct matches
     indices = np.argsort(distmat, axis=1)
     matches = (gallery_ids[indices] == query_ids[:, np.newaxis])
-
+    # Compute CMC for each query
     ret = np.zeros(topk)
     num_valid_queries = 0
     for i in range(m):
-        valid = np.ones_like(gallery_ids[indices[i]], dtype=bool)
+        # Filter out the same id and same camera
+        valid = ((gallery_ids[indices[i]] != query_ids[i]) |
+                 (gallery_cams[indices[i]] != query_cams[i]))
+        if separate_camera_set:
+            # Filter out samples from same camera
+            valid &= (gallery_cams[indices[i]] != query_cams[i])
         if not np.any(matches[i, valid]):
             continue
         if single_gallery_shot:
@@ -159,6 +173,7 @@ def cmc(distmat, query_ids=None, gallery_ids=None,
             repeat = 1
         for _ in range(repeat):
             if single_gallery_shot:
+                # Randomly choose one instance for each id
                 sampled = (valid & _unique_sample(ids_dict, len(valid)))
                 index = np.nonzero(matches[i, sampled])[0]
             else:
@@ -180,20 +195,29 @@ def cmc(distmat, query_ids=None, gallery_ids=None,
 def mean_ap(distmat, query_ids=None, gallery_ids=None,
             query_cams=None, gallery_cams=None):
     m, n = distmat.shape
+    # Fill up default values
     if query_ids is None:
         query_ids = np.arange(m)
     if gallery_ids is None:
         gallery_ids = np.arange(n)
-
+    if query_cams is None:
+        query_cams = np.zeros(m).astype(np.int32)
+    if gallery_cams is None:
+        gallery_cams = np.ones(n).astype(np.int32)
+    # Ensure numpy array
     query_ids = np.asarray(query_ids)
     gallery_ids = np.asarray(gallery_ids)
-
+    query_cams = np.asarray(query_cams)
+    gallery_cams = np.asarray(gallery_cams)
+    # Sort and find correct matches
     indices = np.argsort(distmat, axis=1)
     matches = (gallery_ids[indices] == query_ids[:, np.newaxis])
-
+    # Compute AP for each query
     aps = []
     for i in range(m):
-        valid = np.ones_like(gallery_ids[indices[i]], dtype=bool)
+        # Filter out the same id and same camera
+        valid = ((gallery_ids[indices[i]] != query_ids[i]) |
+                 (gallery_cams[indices[i]] != query_cams[i]))
         y_true = matches[i, valid]
         y_score = -distmat[i][indices[i]][valid]
         if not np.any(y_true):
@@ -207,16 +231,19 @@ def mean_ap(distmat, query_ids=None, gallery_ids=None,
 def compute_mAP_baseline(index, good_index, junk_index):
     ap = 0
     cmc = torch.IntTensor(len(index)).zero_()
-    if good_index.size == 0:
+    if good_index.size == 0:   # if empty
         cmc[0] = -1
         return ap, cmc
 
+    # remove junk_index
     mask = np.in1d(index, junk_index, invert=True)
     index = index[mask]
 
+    # find good_index index
     ngood = len(good_index)
     mask = np.in1d(index, good_index)
-    rows_good = np.argwhere(mask == True).flatten()
+    rows_good = np.argwhere(mask == True)
+    rows_good = rows_good.flatten()
 
     cmc[rows_good[0]:] = 1
     for i in range(ngood):
@@ -226,7 +253,7 @@ def compute_mAP_baseline(index, good_index, junk_index):
             old_precision = i * 1.0 / rows_good[i]
         else:
             old_precision = 1.0
-        ap += d_recall * (old_precision + precision) / 2
+        ap = ap + d_recall * (old_precision + precision) / 2
 
     return ap, cmc
 
@@ -237,28 +264,47 @@ def cmc_baseline(distmat, query_ids=None, gallery_ids=None,
                  single_gallery_shot=False,
                  first_match_break=False):
     m, n = distmat.shape
+    # Fill up default values
     if query_ids is None:
         query_ids = np.arange(m)
     if gallery_ids is None:
         gallery_ids = np.arange(n)
-
+    if query_cams is None:
+        query_cams = np.zeros(m).astype(np.int32)
+    if gallery_cams is None:
+        gallery_cams = np.ones(n).astype(np.int32)
+    # Ensure numpy array
     query_ids = np.asarray(query_ids)
     gallery_ids = np.asarray(gallery_ids)
+    query_cams = np.asarray(query_cams)
+    gallery_cams = np.asarray(gallery_cams)
 
+    #######################################################
+    #####################################################
     CMC = torch.IntTensor(len(gallery_ids)).zero_()
     ap = 0.0
     for i in range(m):
-        index = np.argsort(distmat[i])
+        # predict index
+        index = np.argsort(distmat[i])  # from small to large
+        # index = index[::-1]
+        # index = index[0:2000]
+        # good index
         query_index = np.argwhere(gallery_ids == query_ids[i])
-        good_index = query_index.flatten()
-        junk_index = np.argwhere(gallery_ids == -1).flatten()
+        camera_index = np.argwhere(gallery_cams == query_cams[i])
+
+        good_index = np.setdiff1d(
+            query_index, camera_index, assume_unique=True)
+        junk_index1 = np.argwhere(gallery_ids == -1)
+        junk_index2 = np.intersect1d(query_index, camera_index)
+        junk_index = np.append(junk_index2, junk_index1)  # .flatten())
 
         ap_tmp, CMC_tmp = compute_mAP_baseline(index, good_index, junk_index)
         if CMC_tmp[0] == -1:
             continue
         CMC = CMC + CMC_tmp
         ap += ap_tmp
-
-    CMC = CMC.float() / m
+    CMC = CMC.float()
+    CMC = CMC / m  # average CMC
     mAP = ap / m
+
     return CMC, mAP
