@@ -17,7 +17,12 @@ class LMBN_n_teacher_6_massr(nn.Module):
         self.n_ch = 2
         self.chs = 512 // self.n_ch
 
-        self.massr = MASSR_PixelShuffle()
+        massr = MASSR_PixelShuffle()
+
+        self.massr_global = copy.deepcopy(massr)
+        self.massr_partial = copy.deepcopy(massr)
+        self.massr_channel = copy.deepcopy(massr)
+        
 
         osnet = osnet_x1_0(pretrained=True)
 
@@ -68,11 +73,13 @@ class LMBN_n_teacher_6_massr(nn.Module):
         # if self.batch_drop_block is not None:
         #     x = self.batch_drop_block(x)
 
-        x = self.massr(x)
+        x_glo = self.massr_global(x)
+        x_par = self.massr_partial(x)
+        x_cha = self.massr_channel(x)
 
-        glo = self.global_branch(x)
-        par = self.partial_branch(x)
-        cha = self.channel_branch(x)
+        glo = self.global_branch(x_glo)
+        par = self.partial_branch(x_par)
+        cha = self.channel_branch(x_cha)
 
         if self.activation_map:
             glo_ = glo
