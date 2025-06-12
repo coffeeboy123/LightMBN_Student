@@ -10,36 +10,29 @@ from .massr import MASSR_PixelShuffle
 from torch.autograd import Variable
 
 
-class LMBN_n(nn.Module):
+class LMBN_n_teacher_6(nn.Module):
     def __init__(self, args):
-        super(LMBN_n, self).__init__()
+        super(LMBN_n_teacher_6, self).__init__()
 
         self.n_ch = 2
         self.chs = 512 // self.n_ch
 
-        osnet = osnet_x1_0(pretrained=True)
-
         self.massr = MASSR_PixelShuffle()
 
-        self.backone = nn.Sequential(
-            osnet.conv1,
-            osnet.maxpool,
-            osnet.conv2,
-            osnet.conv3[0]
-        )
+        osnet = osnet_x1_0(pretrained=True)
 
-        conv3 = osnet.conv3[1:]
 
-        self.global_branch = nn.Sequential(copy.deepcopy(
-            conv3), copy.deepcopy(osnet.conv4), copy.deepcopy(osnet.conv5))
 
-        self.partial_branch = nn.Sequential(copy.deepcopy(
-            conv3), copy.deepcopy(osnet.conv4), copy.deepcopy(osnet.conv5))
+        self.global_branch = nn.Sequential(copy.deepcopy(osnet.conv1), copy.deepcopy(osnet.maxpool),
+                                           copy.deepcopy(osnet.conv2),copy.deepcopy(osnet.conv3), copy.deepcopy(osnet.conv4), copy.deepcopy(osnet.conv5))
 
-        self.channel_branch = nn.Sequential(copy.deepcopy(
-            conv3), copy.deepcopy(osnet.conv4), copy.deepcopy(osnet.conv5))
+        self.partial_branch = nn.Sequential(copy.deepcopy(osnet.conv1), copy.deepcopy(osnet.maxpool),
+                                           copy.deepcopy(osnet.conv2),copy.deepcopy(osnet.conv3), copy.deepcopy(osnet.conv4), copy.deepcopy(osnet.conv5))
 
-        self.global_pooling = nn.AdaptiveMaxPool2d((1, 1))
+        self.channel_branch = nn.Sequential(copy.deepcopy(osnet.conv1), copy.deepcopy(osnet.maxpool),
+                                           copy.deepcopy(osnet.conv2),copy.deepcopy(osnet.conv3), copy.deepcopy(osnet.conv4), copy.deepcopy(osnet.conv5))
+
+        self.global_pooling = nn.AdaptiveAvgPool2d((1, 1))
         self.partial_pooling = nn.AdaptiveAvgPool2d((2, 1))
         self.channel_pooling = nn.AdaptiveAvgPool2d((1, 1))
 
@@ -76,8 +69,6 @@ class LMBN_n(nn.Module):
         #     x = self.batch_drop_block(x)
 
         x = self.massr(x)
-
-        x = self.backone(x)
 
         glo = self.global_branch(x)
         par = self.partial_branch(x)
