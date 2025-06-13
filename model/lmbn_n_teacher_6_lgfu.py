@@ -23,7 +23,7 @@ class LMBN_n_teacher_6_lgfu(nn.Module):
 
         self.lgfu_global = copy.deepcopy(lgfu)
         self.lgfu_partial = copy.deepcopy(lgfu)
-        self.lgfu_branch = copy.deepcopy(lgfu)
+        self.lgfu_channel = copy.deepcopy(lgfu)
 
 
 
