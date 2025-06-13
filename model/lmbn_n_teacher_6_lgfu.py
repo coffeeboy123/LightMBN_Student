@@ -5,7 +5,7 @@ from .osnet import osnet_x1_0, OSBlock
 from .attention import BatchDrop, BatchFeatureErase_Top, PAM_Module, CAM_Module, SE_Module, Dual_Module
 from .bnneck import BNNeck, BNNeck3
 from torch.nn import functional as F
-from lgfu import LocalGlobalFusionUpsampler3ch
+from .lgfu import LocalGlobalFusionUpsampler3ch
 
 from torch.autograd import Variable
 
