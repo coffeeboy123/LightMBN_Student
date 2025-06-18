@@ -100,6 +100,10 @@ class LMBN_n_teacher_6_par_3(nn.Module):
         p_upper = p_par[:, :, 2:7, :]
         p_lower = p_par[:, :, 7:12, :]
 
+        p_head = F.adaptive_avg_pool2d(p_head, (1, 1))
+        p_upper = F.adaptive_avg_pool2d(p_upper, (1, 1))
+        p_lower = F.adaptive_avg_pool2d(p_lower, (1, 1))
+
         f_glo = self.reduction_0(glo)
         f_p0 = self.reduction_1(g_par)
         f_p1 = self.reduction_2(p_head)
