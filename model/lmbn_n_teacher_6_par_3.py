@@ -96,15 +96,15 @@ class LMBN_n_teacher_6(nn.Module):
         p_par = self.partial_pooling(par)  # shape:(batchsize, 512,2,1)
         cha = self.channel_pooling(cha)  # shape:(batchsize, 256,1,1)
 
-        p0 = p_par[:, :, 0:5, :]
-        p1 = p_par[:, :, 5:10, :]
-        p2 = p_par[:, :, 10:12, :]
+        p_head = p_par[:, :, 0:2, :]
+        p_upper = p_par[:, :, 2:7, :]
+        p_lower = p_par[:, :, 7:12, :]
 
         f_glo = self.reduction_0(glo)
         f_p0 = self.reduction_1(g_par)
-        f_p1 = self.reduction_2(p0)
-        f_p2 = self.reduction_3(p1)
-        f_p3 = self.reduction_4(p2)
+        f_p1 = self.reduction_2(p_head)
+        f_p2 = self.reduction_3(p_upper)
+        f_p3 = self.reduction_4(p_lower)
         f_glo_drop = self.reduction_5(glo_drop)
 
         ################
