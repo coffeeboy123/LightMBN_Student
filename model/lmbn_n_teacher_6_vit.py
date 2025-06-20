@@ -10,9 +10,9 @@ from .channeltransformer import ChannelTransformer
 from torch.autograd import Variable
 
 
-class LMBN_n_teacher_6(nn.Module):
+class LMBN_n_teacher_6_vit(nn.Module):
     def __init__(self, args):
-        super(LMBN_n_teacher_6, self).__init__()
+        super(LMBN_n_teacher_6_vit, self).__init__()
 
         self.n_ch = 2
         self.chs = 512 // self.n_ch
