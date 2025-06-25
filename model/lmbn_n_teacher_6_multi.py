@@ -17,7 +17,7 @@ class LMBN_n_teacher_6_multi(nn.Module):
         self.n_ch = 2
         self.chs = 512 // self.n_ch
         
-        self.multi_head = MultiHeadChannelRelationReasoning()
+        self.multi_head = MultiHeadChannelRelationReasoning(channels=512)
 
         osnet = osnet_x1_0(pretrained=True)
 
