@@ -5,21 +5,21 @@ from .osnet import osnet_x1_0, OSBlock
 from .attention import BatchDrop, BatchFeatureErase_Top, PAM_Module, CAM_Module, SE_Module, Dual_Module
 from .bnneck import BNNeck, BNNeck3
 from torch.nn import functional as F
-
+from .groupseblock import GroupSEBlock
 
 from torch.autograd import Variable
 
 
-class LMBN_n_teacher_6(nn.Module):
+class LMBN_n_teacher_6_group(nn.Module):
     def __init__(self, args):
-        super(LMBN_n_teacher_6, self).__init__()
+        super(LMBN_n_teacher_6_group, self).__init__()
 
         self.n_ch = 2
         self.chs = 512 // self.n_ch
 
         osnet = osnet_x1_0(pretrained=True)
 
-        
+        self.groups_se = GroupSEBlock(channels=512)
 
         self.global_branch = nn.Sequential(copy.deepcopy(osnet.conv1), copy.deepcopy(osnet.maxpool), 
                                            copy.deepcopy(osnet.conv2),copy.deepcopy(osnet.conv3), copy.deepcopy(osnet.conv4), copy.deepcopy(osnet.conv5))
@@ -70,6 +70,8 @@ class LMBN_n_teacher_6(nn.Module):
         glo = self.global_branch(x)
         par = self.partial_branch(x)
         cha = self.channel_branch(x)
+
+        cha = self.groups_se(cha)
 
         if self.activation_map:
             glo_ = glo
