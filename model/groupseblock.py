@@ -35,8 +35,3 @@ class SEBlock(nn.Module):
         y = self.fc(y).view(b, c, 1, 1)
         return x * y
 
-# 사용 예시 (채널 branch에)
-self.channel_branch = nn.Sequential(
-    ...기존 OSNet 블록...,
-    GroupSEBlock(512, groups=4)  # 4그룹이면 각 그룹 128채널
-)
