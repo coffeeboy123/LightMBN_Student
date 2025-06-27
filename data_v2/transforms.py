@@ -7,6 +7,8 @@ import random
 import numpy as np
 import math
 from collections import deque
+import numpy as np
+import cv2
 
 import torch
 from torchvision.transforms import *
@@ -244,6 +246,32 @@ class RandomPatch(object):
 
         return img
 
+class IRMultiChannel:
+    def __init__(self):
+        pass
+
+    def __call__(self, img):  # img: PIL.Image, 'RGB'
+        img_np = np.array(img)  # (H, W, 3)
+
+        # ch0: R채널(원본)
+        ch0 = img_np[:, :, 0]
+
+        # ch1: G채널에 MedianBlur(15) → Sobel(Edge)
+        g_channel = img_np[:, :, 1]
+        g_blur = cv2.medianBlur(g_channel, 15)
+        edge_x = cv2.Sobel(g_blur, cv2.CV_64F, 1, 0, ksize=3)
+        edge_y = cv2.Sobel(g_blur, cv2.CV_64F, 0, 1, ksize=3)
+        edge = np.sqrt(edge_x**2 + edge_y**2)
+        ch1 = np.clip(edge, 0, 255).astype(np.uint8)
+
+        # ch2: B채널에 저주파(blur)
+        ch2 = cv2.GaussianBlur(img_np[:, :, 2], (7, 7), 0)
+
+        img_3ch = np.stack([ch0, ch1, ch2], axis=2)
+        img_3ch = Image.fromarray(img_3ch)
+        return img_3ch
+
+
 
 def build_transforms(height, width, transforms='random_flip', norm_mean=[0.485, 0.456, 0.406],
                      norm_std=[0.229, 0.224, 0.225], **kwargs):
@@ -279,6 +307,7 @@ def build_transforms(height, width, transforms='random_flip', norm_mean=[0.485, 
     print('Building train transforms ...')
     transform_tr = []
     transform_tr += [Resize((height, width))]
+    transform_tr += [IRMultiChannel()]
     print('+ resize to {}x{}'.format(height, width))
     if 'random_flip' in transforms:
         print('+ random flip')
@@ -313,6 +342,7 @@ def build_transforms(height, width, transforms='random_flip', norm_mean=[0.485, 
     print('+ normalization (mean={}, std={})'.format(norm_mean, norm_std))
     transform_te = Compose([
         Resize((height, width)),
+        IRMultiChannel(),
         ToTensor(),
         normalize,
     ])
