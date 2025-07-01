@@ -34,9 +34,9 @@ class checkpoint():
         if args.load == '':
             if args.save == '':
                 args.save = now
-            self.dir = '/content/gdrive/MyDrive/LightMBN_SAVE_transformers' + '/experiment/' + args.save
+            self.dir = '/content/gdrive/MyDrive/LightMBN_REAL_SAVE' + '/experiment/' + args.save
         else:
-            self.dir = '/content/gdrive/MyDrive/LightMBN_SAVE_transformers' + '/experiment/' + args.save
+            self.dir = '/content/gdrive/MyDrive/LightMBN_REAL_SAVE' + '/experiment/' + args.save
             if not os.path.exists(self.dir):
                 args.load = ''
             args.save = args.load
