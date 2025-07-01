@@ -5,6 +5,7 @@ from .osnet import osnet_x1_0, OSBlock
 from .attention import BatchDrop, BatchFeatureErase_Top, PAM_Module, CAM_Module, SE_Module, Dual_Module
 from .bnneck import BNNeck, BNNeck3
 from torch.nn import functional as F
+from .mamba_like import MambaLikeChannelBlock
 
 
 from torch.autograd import Variable
@@ -72,8 +73,6 @@ class LMBN_n_teacher_6_mamba_like(nn.Module):
 
         glo = self.global_branch(x)
         par = self.partial_branch(x)
-        cha = self.channel_branch(x)
-
         cha = self.channel_branch(x)
         cha = self.channel_mamba_block(cha)
 
