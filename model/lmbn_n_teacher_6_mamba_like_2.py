@@ -98,7 +98,7 @@ class LMBN_n_teacher_6_mamba_like_2(nn.Module):
         glo = self.channel_pooling(glo)  # shape:(batchsize, 512,1,1)
         g_par = self.global_pooling(par)  # shape:(batchsize, 512,1,1)
         p_par = self.partial_pooling(par)  # shape:(batchsize, 512,2,1)
-        cha = self.channel_pooling(cha)  # shape:(batchsize, 256,1,1)
+
 
         p0 = p_par[:, :, 0:1, :]
         p1 = p_par[:, :, 1:2, :]
@@ -111,14 +111,17 @@ class LMBN_n_teacher_6_mamba_like_2(nn.Module):
 
         ################
 
-        c0 = cha[:, :self.chs, :, :]
-        c1 = cha[:, self.chs:, :, :]
+        c0, c1 = cha[:, :256], cha[:, 256:]         # (B, 256, H, W)
 
-        c0 = self.channel_mamba_block(c0)  # 내부에서 residual 처리됨
+        c0 = self.channel_mamba_block(c0)           # 여기서 SSM-like 연산 가능
         c1 = self.channel_mamba_block(c1)
 
-        c0 = self.shared(c0)
+        c0 = self.shared(c0)                        # (B, feats, H, W)
         c1 = self.shared(c1)
+
+        c0 = self.channel_pooling(c0)               # (B, feats, 1, 1)
+        c1 = self.channel_pooling(c1)
+
         f_c0 = self.reduction_ch_0(c0)
         f_c1 = self.reduction_ch_1(c1)
 
