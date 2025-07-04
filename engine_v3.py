@@ -80,6 +80,8 @@ class Engine:
             outputs = self.model(inputs)
             loss = self.loss.compute(outputs, labels)
 
+            running_loss += loss.item()  # ← 추가: tensor → float 로 누적
+
             loss.backward()
             self.optimizer.step()
 
@@ -99,6 +101,14 @@ class Engine:
 
         self.scheduler.step()
         self.loss.end_log(len(self.train_loader))
+
+        avg_loss = running_loss / len(self.train_loader)
+
+        # checkpoint에 기록
+        self.ckpt.loss_history.append(avg_loss)
+
+        # loss curve 저장 (원하는 시점에—예: 매 epoch마다)
+        self.ckpt.plot_loss(epoch + 1)
 
     def test(self):
         epoch = self.scheduler.last_epoch

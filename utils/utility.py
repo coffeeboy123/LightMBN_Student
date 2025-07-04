@@ -24,6 +24,7 @@ class checkpoint():
         self.log = torch.Tensor()
         self.since = datetime.datetime.now()
         now = datetime.datetime.now().strftime('%Y-%m-%d-%H-%M-%S')
+        self.loss_history = []  # 매 epoch 평균 loss를 여기에 append
 
         def _make_dir(path):
             if not os.path.exists(path):
@@ -92,6 +93,21 @@ class checkpoint():
 
         if self.local_dir is not None:
             copyfile(config_path, os.path.join(self.local_dir, self.config_filename))
+
+    def plot_loss(self, epoch):
+        """training loss curve를 PDF로 저장 (한 파일만 덮어쓰기)"""
+        epochs = list(range(1, epoch + 1))
+        fig = plt.figure()
+        plt.plot(epochs, self.loss_history)
+        plt.title(f'{self.args.model} Training Loss')
+        plt.xlabel('Epoch')
+        plt.ylabel('Average Loss')
+        plt.grid(True)
+
+        # epoch 번호를 빼고 고정된 이름으로
+        fname = f'{self.args.model}_{self.args.data_train}_{self.fold}_loss_curve.pdf'
+        plt.savefig(os.path.join(self.dir, fname), dpi=600)
+        plt.close(fig)            
 
     def add_log(self, log):
         self.log = torch.cat([self.log, log])
