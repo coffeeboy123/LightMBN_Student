@@ -5,7 +5,6 @@ from .osnet import osnet_x1_0, OSBlock
 from .attention import BatchDrop, BatchFeatureErase_Top, PAM_Module, CAM_Module, SE_Module, Dual_Module
 from .bnneck import BNNeck, BNNeck3
 from torch.nn import functional as F
-from .massr import MASSR_PixelShuffle
 
 from torch.autograd import Variable
 
@@ -19,7 +18,6 @@ class LMBN_n(nn.Module):
 
         osnet = osnet_x1_0(pretrained=True)
 
-        self.massr = MASSR_PixelShuffle()
 
         self.backone = nn.Sequential(
             osnet.conv1,
@@ -74,8 +72,6 @@ class LMBN_n(nn.Module):
     def forward(self, x):
         # if self.batch_drop_block is not None:
         #     x = self.batch_drop_block(x)
-
-        x = self.massr(x)
 
         x = self.backone(x)
 
