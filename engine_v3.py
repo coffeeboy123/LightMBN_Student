@@ -68,6 +68,7 @@ class Engine:
             )
             self.lr = lr
         self.loss.start_log()
+        running_loss = 0.0
         self.model.train()
 
         for batch, d in enumerate(self.train_loader):
