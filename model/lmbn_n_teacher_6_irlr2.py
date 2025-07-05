@@ -5,36 +5,40 @@ from .osnet import osnet_x1_0, OSBlock
 from .attention import BatchDrop, BatchFeatureErase_Top, PAM_Module, CAM_Module, SE_Module, Dual_Module
 from .bnneck import BNNeck, BNNeck3
 from torch.nn import functional as F
-from .mamba_like import MambaLikeChannelBlock
+from .irlr2 import IRLRPreprocessorV2
 
 
 from torch.autograd import Variable
 
 
-class LMBN_n_teacher_6_mamba_like(nn.Module):
+class LMBN_n_teacher_6_irlr2(nn.Module):
     def __init__(self, args):
-        super(LMBN_n_teacher_6_mamba_like, self).__init__()
+        super(LMBN_n_teacher_6_irlr2, self).__init__()
 
         self.n_ch = 2
         self.chs = 512 // self.n_ch
 
+        irlr2 = IRLRPreprocessorV2()
+
+        self.irlr2_global = copy.deepcopy(irlr2)
+        self.irlr2_partial = copy.deepcopy(irlr2)
+        self.irlr2_channel = copy.deepcopy(irlr2)
+
+
         osnet = osnet_x1_0(pretrained=True)
 
-        self.channel_mamba_block = MambaLikeChannelBlock(512)
 
 
-        
-
-        self.global_branch = nn.Sequential(copy.deepcopy(osnet.conv1), copy.deepcopy(osnet.maxpool), 
+        self.global_branch = nn.Sequential(copy.deepcopy(osnet.conv1), copy.deepcopy(osnet.maxpool),
                                            copy.deepcopy(osnet.conv2),copy.deepcopy(osnet.conv3), copy.deepcopy(osnet.conv4), copy.deepcopy(osnet.conv5))
 
-        self.partial_branch = nn.Sequential(copy.deepcopy(osnet.conv1), copy.deepcopy(osnet.maxpool), 
+        self.partial_branch = nn.Sequential(copy.deepcopy(osnet.conv1), copy.deepcopy(osnet.maxpool),
                                            copy.deepcopy(osnet.conv2),copy.deepcopy(osnet.conv3), copy.deepcopy(osnet.conv4), copy.deepcopy(osnet.conv5))
 
-        self.channel_branch = nn.Sequential(copy.deepcopy(osnet.conv1), copy.deepcopy(osnet.maxpool), 
+        self.channel_branch = nn.Sequential(copy.deepcopy(osnet.conv1), copy.deepcopy(osnet.maxpool),
                                            copy.deepcopy(osnet.conv2),copy.deepcopy(osnet.conv3), copy.deepcopy(osnet.conv4), copy.deepcopy(osnet.conv5))
 
-        self.global_pooling = nn.AdaptiveMaxPool2d((1, 1))
+        self.global_pooling = nn.AdaptiveAvgPool2d((1, 1))
         self.partial_pooling = nn.AdaptiveAvgPool2d((2, 1))
         self.channel_pooling = nn.AdaptiveAvgPool2d((1, 1))
 
@@ -70,12 +74,14 @@ class LMBN_n_teacher_6_mamba_like(nn.Module):
         # if self.batch_drop_block is not None:
         #     x = self.batch_drop_block(x)
 
+        glo_x = self.irlr2_global(x)
+        par_x = self.irlr2_partial(x)
+        cha_x = self.irlr2_channel(x)
 
-        glo = self.global_branch(x)
-        par = self.partial_branch(x)
-        cha = self.channel_branch(x)
-        cha = self.channel_mamba_block(cha)
 
+        glo = self.global_branch(glo_x)
+        par = self.partial_branch(par_x)
+        cha = self.channel_branch(cha_x)
 
         if self.activation_map:
             glo_ = glo

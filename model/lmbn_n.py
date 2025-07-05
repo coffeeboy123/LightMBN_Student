@@ -18,7 +18,6 @@ class LMBN_n(nn.Module):
 
         osnet = osnet_x1_0(pretrained=True)
 
-
         self.backone = nn.Sequential(
             osnet.conv1,
             osnet.maxpool,

@@ -18,51 +18,34 @@ class LMBN_n_teacher_6_fuse(nn.Module):
 
         osnet = osnet_x1_0(pretrained=True)
 
+        conv3 = osnet.conv3[1:]
+
+        self.global_branch_mid = nn.Sequential(copy.deepcopy(osnet.conv1), copy.deepcopy(osnet.maxpool),
+                                           copy.deepcopy(osnet.conv2),copy.deepcopy(osnet.conv3[0]))
+        self.global_branch_fin = nn.Sequential(copy.deepcopy(conv3), copy.deepcopy(osnet.conv4), copy.deepcopy(osnet.conv5))
 
 
-        self.global_branch = nn.Sequential(copy.deepcopy(osnet.conv1), copy.deepcopy(osnet.maxpool),
-                                           copy.deepcopy(osnet.conv2),copy.deepcopy(osnet.conv3), copy.deepcopy(osnet.conv4), copy.deepcopy(osnet.conv5))
+        self.partial_branch_mid = nn.Sequential(copy.deepcopy(osnet.conv1), copy.deepcopy(osnet.maxpool),
+                                           copy.deepcopy(osnet.conv2),copy.deepcopy(osnet.conv3[0]))
+        self.partial_branch_fin = nn.Sequential(copy.deepcopy(conv3), copy.deepcopy(osnet.conv4), copy.deepcopy(osnet.conv5))
 
-        self.partial_branch = nn.Sequential(copy.deepcopy(osnet.conv1), copy.deepcopy(osnet.maxpool),
-                                           copy.deepcopy(osnet.conv2),copy.deepcopy(osnet.conv3), copy.deepcopy(osnet.conv4), copy.deepcopy(osnet.conv5))
 
-        self.channel_branch = nn.Sequential(copy.deepcopy(osnet.conv1), copy.deepcopy(osnet.maxpool),
-                                           copy.deepcopy(osnet.conv2),copy.deepcopy(osnet.conv3), copy.deepcopy(osnet.conv4), copy.deepcopy(osnet.conv5))
+        self.channel_branch_mid = nn.Sequential(copy.deepcopy(osnet.conv1), copy.deepcopy(osnet.maxpool),
+                                           copy.deepcopy(osnet.conv2),copy.deepcopy(osnet.conv3[0]))
+        self.channel_branch_fin = nn.Sequential(copy.deepcopy(conv3), copy.deepcopy(osnet.conv4), copy.deepcopy(osnet.conv5))
 
         self.fusion_conv = nn.Sequential(
-            nn.Conv2d(512 * 3, 512 * 3, kernel_size=1, bias=False),  # 3개를 concat하니까 채널은 512*3
-            nn.BatchNorm2d(512 * 3),
+            nn.Conv2d(384 * 3, 384 * 3, kernel_size=1, bias=False),  # 3개를 concat하니까 채널은 512*3
+            nn.BatchNorm2d(384 * 3),
             nn.ReLU(inplace=True)
         )
 
-        self.split_global = nn.Conv2d(512, 512, kernel_size=1, bias=False)
-        self.split_partial = nn.Conv2d(512, 512, kernel_size=1, bias=False)
-        self.split_channel = nn.Conv2d(512, 512, kernel_size=1, bias=False)
-
-        self.global_gate = nn.Sequential(
+        self.shared_gate = nn.Sequential(
             nn.AdaptiveAvgPool2d(1),  # Global descriptor
-            nn.Conv2d(1536, 512, 1, bias=False),  # Reduce to 512
-            nn.BatchNorm2d(512),
+            nn.Conv2d(384 * 3, 384, 1, bias=False),
+            nn.BatchNorm2d(384),
             nn.ReLU(inplace=True),
-            nn.Conv2d(512, 1536, 1, bias=False),
-            nn.Sigmoid()
-        )
-
-        self.partial_gate = nn.Sequential(
-            nn.AdaptiveAvgPool2d(1),  # Global descriptor
-            nn.Conv2d(1536, 512, 1, bias=False),  # Reduce to 512
-            nn.BatchNorm2d(512),
-            nn.ReLU(inplace=True),
-            nn.Conv2d(512, 1536, 1, bias=False),
-            nn.Sigmoid()
-        )
-
-        self.channel_gate = nn.Sequential(
-            nn.AdaptiveAvgPool2d(1),  # Global descriptor
-            nn.Conv2d(1536, 512, 1, bias=False),  # Reduce to 512
-            nn.BatchNorm2d(512),
-            nn.ReLU(inplace=True),
-            nn.Conv2d(512, 1536, 1, bias=False),
+            nn.Conv2d(384, 384 * 3, 1, bias=False),
             nn.Sigmoid()
         )
 
@@ -103,24 +86,28 @@ class LMBN_n_teacher_6_fuse(nn.Module):
         #     x = self.batch_drop_block(x)
 
 
-        _glo = self.global_branch(x)
-        _par = self.partial_branch(x)
-        _cha = self.channel_branch(x)
+        glo_mid = self.global_branch_mid(x)
+        par_mid = self.partial_branch_mid(x)
+        cha_mid = self.channel_branch_mid(x)
 
 
-        fusion = torch.cat([_glo, _par, _cha], dim=1)  # dim=1은 channel 방향
+        fusion = torch.cat([glo_mid, par_mid, cha_mid], dim=1)  # dim=1은 channel 방향
 
         # 3. feature interaction
         fusion = self.fusion_conv(fusion)
 
-        fusion_att_glo = fusion * self.global_gate(fusion)  # Element-wise multiply
-        fusion_att_par = fusion * self.partial_gate(fusion)
-        fusion_att_cha = fusion * self.channel_gate(fusion)
+        fusion_att = fusion * self.shared_gate(fusion)
 
         # 4. split
-        glo = fusion_att_glo[:, :512, :, :]
-        par = fusion_att_par[:, 512:1024, :, :]
-        cha = fusion_att_cha[:, 1024:, :, :]
+        glo_fin = fusion_att[:, :384, :, :]
+        par_fin = fusion_att[:, 384:384*2, :, :]
+        cha_fin = fusion_att[:, 384*2:, :, :]
+
+        glo = self.global_branch_fin(glo_fin)
+        par = self.partial_branch_fin(par_fin)
+        cha = self.channel_branch_fin(cha_fin)
+
+
 
         if self.activation_map:
             glo_ = glo

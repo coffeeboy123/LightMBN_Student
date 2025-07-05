@@ -1,62 +1,80 @@
 import copy
 import torch
 from torch import nn
-from .osnet import osnet_x1_0, OSBlock
+from .osnet import osnet_x1_0, OSBlock, osnet_x0_25
 from .attention import BatchDrop, BatchFeatureErase_Top, PAM_Module, CAM_Module, SE_Module, Dual_Module
-from .bnneck import BNNeck, BNNeck3
+from .bnneck import BNNeck, BNNeck3, BNNeck3_neck, BNNeck3_classifier, BNNeck_neck, BNNeck_classifier
 from torch.nn import functional as F
 
 from torch.autograd import Variable
 
 
-class LMBN_n(nn.Module):
+class LMBN_n_student_2_2(nn.Module):
     def __init__(self, args):
-        super(LMBN_n, self).__init__()
+        super(LMBN_n_student_2_2, self).__init__()
 
         self.n_ch = 2
         self.chs = 512 // self.n_ch
 
-        osnet = osnet_x1_0(pretrained=True)
+        osnet = osnet_x0_25(pretrained=True)
 
         self.backone = nn.Sequential(
             osnet.conv1,
-            osnet.maxpool,
             osnet.conv2,
-            osnet.conv3[0]
+            osnet.maxpool
         )
 
-        conv3 = osnet.conv3[1:]
 
-        self.global_branch = nn.Sequential(copy.deepcopy(
-            conv3), copy.deepcopy(osnet.conv4), copy.deepcopy(osnet.conv5))
 
-        self.partial_branch = nn.Sequential(copy.deepcopy(
-            conv3), copy.deepcopy(osnet.conv4), copy.deepcopy(osnet.conv5))
+        self.global_branch = nn.Sequential(copy.deepcopy(osnet.conv3),
+                                           nn.Conv2d(96, 512, kernel_size=1, groups=16),
+                                           nn.BatchNorm2d(512),
+                                           nn.ReLU(inplace=True))
 
-        self.channel_branch = nn.Sequential(copy.deepcopy(
-            conv3), copy.deepcopy(osnet.conv4), copy.deepcopy(osnet.conv5))
 
-        self.global_pooling = nn.AdaptiveMaxPool2d((1, 1))
+        self.partial_branch = nn.Sequential(copy.deepcopy(osnet.conv3),
+                                           nn.Conv2d(96, 512, kernel_size=1, groups=16),
+                                           nn.BatchNorm2d(512),
+                                           nn.ReLU(inplace=True))
+
+        self.channel_branch = nn.Sequential(copy.deepcopy(osnet.conv3),
+                                           nn.Conv2d(96, 512, kernel_size=1, groups=16),
+                                           nn.BatchNorm2d(512),
+                                           nn.ReLU(inplace=True))
+
+        self.global_pooling = nn.AdaptiveAvgPool2d((1, 1))
         self.partial_pooling = nn.AdaptiveAvgPool2d((2, 1))
         self.channel_pooling = nn.AdaptiveAvgPool2d((1, 1))
 
-        reduction = BNNeck3(512, args.num_classes,
+        reduction_neck = BNNeck3_neck(512, args.feats, return_f=True)
+
+        self.reduction_0_neck = copy.deepcopy(reduction_neck)
+        self.reduction_1_neck = copy.deepcopy(reduction_neck)
+        self.reduction_2_neck = copy.deepcopy(reduction_neck)
+        self.reduction_3_neck = copy.deepcopy(reduction_neck)
+        self.reduction_4_neck = copy.deepcopy(reduction_neck)
+
+        reduction_classifier = BNNeck3_classifier(512, args.num_classes,
                             args.feats, return_f=True)
 
-        self.reduction_0 = copy.deepcopy(reduction)
-        self.reduction_1 = copy.deepcopy(reduction)
-        self.reduction_2 = copy.deepcopy(reduction)
-        self.reduction_3 = copy.deepcopy(reduction)
-        self.reduction_4 = copy.deepcopy(reduction)
+        self.reduction_0_classifier = copy.deepcopy(reduction_classifier)
+        self.reduction_1_classifier = copy.deepcopy(reduction_classifier)
+
 
         self.shared = nn.Sequential(nn.Conv2d(
             self.chs, args.feats, 1, bias=False), nn.BatchNorm2d(args.feats), nn.ReLU(True))
         self.weights_init_kaiming(self.shared)
 
-        self.reduction_ch_0 = BNNeck(
+        self.reduction_ch_0_neck = BNNeck_neck(
+            args.feats,  return_f=True)
+
+        self.reduction_ch_1_neck = BNNeck_neck(
+            args.feats, return_f=True)
+
+        self.reduction_ch_0_classifier = BNNeck_classifier(
             args.feats, args.num_classes, return_f=True)
-        self.reduction_ch_1 = BNNeck(
-            args.feats, args.num_classes, return_f=True)
+
+
 
         # if args.drop_block:
         #     print('Using batch random erasing block.')
@@ -105,11 +123,17 @@ class LMBN_n(nn.Module):
         p0 = p_par[:, :, 0:1, :]
         p1 = p_par[:, :, 1:2, :]
 
-        f_glo = self.reduction_0(glo)
-        f_p0 = self.reduction_1(g_par)
-        f_p1 = self.reduction_2(p0)
-        f_p2 = self.reduction_3(p1)
-        f_glo_drop = self.reduction_4(glo_drop)
+        f_glo_after,  f_glo_before= self.reduction_0_neck(glo)
+        f_p0_after,  f_p0_before= self.reduction_1_neck(g_par)
+        f_p1_after, f_p1_before= self.reduction_2_neck(p0)
+        f_p2_after, f_p2_before = self.reduction_3_neck(p1)
+        f_glo_drop_after, f_glo_drop_before = self.reduction_4_neck(glo_drop)
+
+        p_avg = (f_p0_after + f_p1_after + f_p2_after)/3
+        glo_avg = (f_glo_after + f_glo_drop_after)/2
+
+        p_avg_score = self.reduction_0_classifier(p_avg)
+        glo_avg_score = self.reduction_1_classifier(glo_avg)
 
         ################
 
@@ -117,19 +141,20 @@ class LMBN_n(nn.Module):
         c1 = cha[:, self.chs:, :, :]
         c0 = self.shared(c0)
         c1 = self.shared(c1)
-        f_c0 = self.reduction_ch_0(c0)
-        f_c1 = self.reduction_ch_1(c1)
+        f_c0_after,  f_c0_before= self.reduction_ch_0_neck(c0)
+        f_c1_after,  f_c1_before= self.reduction_ch_1_neck(c1)
 
-        ################
+        c_avg = (f_c0_after + f_c1_after)/2
+        c_avg_score = self.reduction_ch_0_classifier(c_avg)
 
-        fea = [f_glo[-1], f_glo_drop[-1], f_p0[-1]]
+        fea = [f_glo_before, f_glo_drop_before, f_p0_before, f_p1_before, f_p2_before, f_c0_before, f_c1_before]
 
         if not self.training:
 
-            return torch.stack([f_glo[0], f_glo_drop[0], f_p0[0], f_p1[0], f_p2[0], f_c0[0], f_c1[0]], dim=2)
+            return torch.stack([f_glo_before, f_glo_drop_before, f_p0_before, f_p1_before, f_p2_before, f_c0_before, f_c1_before], dim=2)
             # return torch.stack([f_glo_drop[0], f_p0[0], f_p1[0], f_p2[0], f_c0[0], f_c1[0]], dim=2)
 
-        return [f_glo[1], f_glo_drop[1], f_p0[1], f_p1[1], f_p2[1], f_c0[1], f_c1[1]], fea
+        return [p_avg_score, glo_avg_score, c_avg_score], fea
 
     def weights_init_kaiming(self, m):
         classname = m.__class__.__name__

@@ -1,7 +1,7 @@
 import copy
 import torch
 from torch import nn
-from .osnet import osnet_x1_0, OSBlock, osnet_x0_25, LightConv3x3, osnet_x0
+from .osnet import osnet_x1_0, OSBlock, osnet_x0_25, LightConv3x3
 from .attention import BatchDrop, BatchFeatureErase_Top, PAM_Module, CAM_Module, SE_Module, Dual_Module
 from .bnneck import BNNeck, BNNeck3_depthwise
 from torch.nn import functional as F

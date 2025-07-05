@@ -1,7 +1,7 @@
 import copy
 import torch
 from torch import nn
-from .osnet import osnet_x1_0, OSBlock, osnet_x0_25, LightConv3x3, osnet_x0
+from .osnet import osnet_x1_0, OSBlock, osnet_x0_25, LightConv3x3
 from .attention import BatchDrop, BatchFeatureErase_Top, PAM_Module, CAM_Module, SE_Module, Dual_Module
 from .bnneck import BNNeck, BNNeck3_depthwise
 from torch.nn import functional as F
@@ -21,24 +21,33 @@ class LMBN_n_student_10(nn.Module):
         self.backone = nn.Sequential(
             osnet.conv1,
             osnet.maxpool,
-            osnet.conv2
+            LightConv3x3(16, 32),
+            nn.AvgPool2d(2, stride=2)
         )
 
-        self.global_branch = nn.Sequential(copy.deepcopy(osnet.conv3), 
-                                           nn.Conv2d(128, 512, kernel_size=1, bias=False),  # groups=128
+        self.global_branch = nn.Sequential(LightConv3x3(32, 64),
+                                           nn.AvgPool2d(2, stride=2),
+                                           LightConv3x3(64, 128),
+                                           nn.Conv2d(128, 512, kernel_size=1, groups=128, bias=False),  # groups=128
                                            nn.BatchNorm2d(512),
-                                           nn.ReLU(inplace=True))
+                                           nn.ReLU(inplace=True)
+                                           )
 
-
-        self.partial_branch = nn.Sequential(copy.deepcopy(osnet.conv3), 
-                                           nn.Conv2d(128, 512, kernel_size=1, bias=False),  # groups=128
+        self.partial_branch = nn.Sequential(LightConv3x3(32, 64),
+                                           nn.AvgPool2d(2, stride=2),
+                                           LightConv3x3(64, 128),
+                                           nn.Conv2d(128, 512, kernel_size=1, groups=128, bias=False),  # groups=128
                                            nn.BatchNorm2d(512),
-                                           nn.ReLU(inplace=True))
+                                           nn.ReLU(inplace=True)
+                                           )
 
-        self.channel_branch = nn.Sequential(copy.deepcopy(osnet.conv3), 
-                                           nn.Conv2d(128, 512, kernel_size=1, bias=False),  # groups=128
+        self.channel_branch = nn.Sequential(LightConv3x3(32, 64),
+                                           nn.AvgPool2d(2, stride=2),
+                                           LightConv3x3(64, 128),
+                                           nn.Conv2d(128, 512, kernel_size=1, groups=128, bias=False),  # groups=128
                                            nn.BatchNorm2d(512),
-                                           nn.ReLU(inplace=True))
+                                           nn.ReLU(inplace=True)
+                                           )
 
         self.global_pooling = nn.AdaptiveAvgPool2d((1, 1))
         self.partial_pooling = nn.AdaptiveAvgPool2d((2, 1))

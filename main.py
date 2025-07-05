@@ -31,6 +31,7 @@ if __name__ == '__main__':
     optimzer = make_optimizer(args, model)
     loss = make_loss(args, ckpt) if not args.test_only else None
 
+
     start = -1
     if args.load != "":
         start, model, optimizer = ckpt.resume_from_checkpoint(

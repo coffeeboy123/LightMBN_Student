@@ -21,47 +21,18 @@ class LMBN_n_student_11(nn.Module):
         self.backone = nn.Sequential(
             osnet.conv1,
             osnet.maxpool,
-            nn.Conv2d(16, 32, kernel_size=3, padding=1, groups=16, bias=False),  # groups=128
-            nn.BatchNorm2d(32),
-            nn.ReLU(inplace=True),
-            nn.AvgPool2d(2, stride=2)
+            LightConv3x3(16, 32),
+            nn.AvgPool2d(2, stride=2),
+            LightConv3x3(32, 64),
+            nn.AvgPool2d(2, stride=2),
+            LightConv3x3(64, 128),
+            nn.Conv2d(128, 512, kernel_size=1, groups=128, bias=False),  # groups=128
+            nn.BatchNorm2d(512),
+            nn.ReLU(inplace=True)
         )
 
-        self.global_branch = nn.Sequential(nn.Conv2d(32, 64, kernel_size=3, padding=1, groups=32, bias=False),
-                                           nn.BatchNorm2d(64),
-                                           nn.ReLU(inplace=True),
-                                           nn.AvgPool2d(2, stride=2),
-                                           nn.Conv2d(64, 128, kernel_size=3, padding=1, groups=64, bias=False),
-                                           nn.BatchNorm2d(128),
-                                           nn.ReLU(inplace=True),
-                                           nn.Conv2d(128, 512, kernel_size=1, groups=128, bias=False),  # groups=128
-                                           nn.BatchNorm2d(512),
-                                           nn.ReLU(inplace=True)
-                                           )
 
-        self.partial_branch = nn.Sequential(nn.Conv2d(32, 64, kernel_size=3, padding=1, groups=32, bias=False),
-                                           nn.BatchNorm2d(64),
-                                           nn.ReLU(inplace=True),
-                                           nn.AvgPool2d(2, stride=2),
-                                           nn.Conv2d(64, 128, kernel_size=3, padding=1, groups=64, bias=False),
-                                           nn.BatchNorm2d(128),
-                                           nn.ReLU(inplace=True),
-                                           nn.Conv2d(128, 512, kernel_size=1, groups=128, bias=False),  # groups=128
-                                           nn.BatchNorm2d(512),
-                                           nn.ReLU(inplace=True)
-                                           )
 
-        self.channel_branch = nn.Sequential(nn.Conv2d(32, 64, kernel_size=3, padding=1, groups=32, bias=False),
-                                           nn.BatchNorm2d(64),
-                                           nn.ReLU(inplace=True),
-                                           nn.AvgPool2d(2, stride=2),
-                                           nn.Conv2d(64, 128, kernel_size=3, padding=1, groups=64, bias=False),
-                                           nn.BatchNorm2d(128),
-                                           nn.ReLU(inplace=True),
-                                           nn.Conv2d(128, 512, kernel_size=1, groups=128, bias=False),  # groups=128
-                                           nn.BatchNorm2d(512),
-                                           nn.ReLU(inplace=True)
-                                           )
         self.global_pooling = nn.AdaptiveAvgPool2d((1, 1))
         self.partial_pooling = nn.AdaptiveAvgPool2d((2, 1))
         self.channel_pooling = nn.AdaptiveAvgPool2d((1, 1))
@@ -100,9 +71,9 @@ class LMBN_n_student_11(nn.Module):
 
         x = self.backone(x)
 
-        glo = self.global_branch(x)
-        par = self.partial_branch(x)
-        cha = self.channel_branch(x)
+        glo = x
+        par = x
+        cha = x
 
         if self.activation_map:
             glo_ = glo

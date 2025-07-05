@@ -24,6 +24,7 @@ __image_datasets = {
     "cuhk02": CUHK02,
     "mot17": MOT17,
     "aicity24": AICity24Balanced,
+    "market1501": Market1501,
 }
 
 

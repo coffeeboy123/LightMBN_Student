@@ -20,3 +20,4 @@ from .cuhk03_splited import CUHK03_splited
 from .msmt17 import MSMT17
 from .mot17 import MOT17
 from .aicity24 import AICity24Balanced
+from .market1501 import Market1501

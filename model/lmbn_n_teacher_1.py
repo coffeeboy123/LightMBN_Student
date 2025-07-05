@@ -9,9 +9,9 @@ from torch.nn import functional as F
 from torch.autograd import Variable
 
 
-class LMBN_n_teacher_1(nn.Module):
+class LMBN_n(nn.Module):
     def __init__(self, args):
-        super(LMBN_n_teacher_1, self).__init__()
+        super(LMBN_n, self).__init__()
 
         self.n_ch = 2
         self.chs = 512 // self.n_ch
@@ -36,7 +36,7 @@ class LMBN_n_teacher_1(nn.Module):
         self.channel_branch = nn.Sequential(copy.deepcopy(
             conv3), copy.deepcopy(osnet.conv4), copy.deepcopy(osnet.conv5))
 
-        self.global_pooling = nn.AdaptiveAvgPool2d((1, 1))
+        self.global_pooling = nn.AdaptiveMaxPool2d((1, 1))
         self.partial_pooling = nn.AdaptiveAvgPool2d((2, 1))
         self.channel_pooling = nn.AdaptiveAvgPool2d((1, 1))
 
@@ -122,7 +122,7 @@ class LMBN_n_teacher_1(nn.Module):
 
         ################
 
-        fea = [f_glo[-1], f_glo_drop[-1], f_p0[-1], f_p1[-1], f_p2[-1], f_c0[-1], f_c1[-1]]
+        fea = [f_glo[-1], f_glo_drop[-1], f_p0[-1]]
 
         if not self.training:
 

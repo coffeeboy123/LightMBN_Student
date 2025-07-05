@@ -161,21 +161,21 @@ class OSBlock(nn.Module):
         super(OSBlock, self).__init__()
         mid_channels = out_channels // bottleneck_reduction
         self.conv1 = Conv1x1(in_channels, mid_channels)
-        self.conv2a = LightConv3x3(mid_channels, mid_channels)
-        self.conv2b = nn.Sequential(
-            LightConv3x3(mid_channels, mid_channels),
-            LightConv3x3(mid_channels, mid_channels),
+        self.conv2a = Conv3x3(mid_channels, mid_channels)  # 1-stack
+        self.conv2b = nn.Sequential(  # 2-stack
+            Conv3x3(mid_channels, mid_channels),
+            Conv3x3(mid_channels, mid_channels)
         )
-        self.conv2c = nn.Sequential(
-            LightConv3x3(mid_channels, mid_channels),
-            LightConv3x3(mid_channels, mid_channels),
-            LightConv3x3(mid_channels, mid_channels),
+        self.conv2c = nn.Sequential(  # 3-stack
+            Conv3x3(mid_channels, mid_channels),
+            Conv3x3(mid_channels, mid_channels),
+            Conv3x3(mid_channels, mid_channels)
         )
-        self.conv2d = nn.Sequential(
-            LightConv3x3(mid_channels, mid_channels),
-            LightConv3x3(mid_channels, mid_channels),
-            LightConv3x3(mid_channels, mid_channels),
-            LightConv3x3(mid_channels, mid_channels),
+        self.conv2d = nn.Sequential(  # 4-stack
+            Conv3x3(mid_channels, mid_channels),
+            Conv3x3(mid_channels, mid_channels),
+            Conv3x3(mid_channels, mid_channels),
+            Conv3x3(mid_channels, mid_channels)
         )
         self.gate = ChannelGate(mid_channels)
         self.conv3 = Conv1x1Linear(mid_channels, out_channels)
@@ -397,7 +397,7 @@ def osnet_x1_25(num_classes=1000, pretrained=True, loss='softmax', **kwargs):
     if pretrained:
         init_pretrained_weights(model, key='osnet_x1_25')
 
-def osnet_x1_0(num_classes=1000, pretrained=True, loss='softmax', **kwargs):
+def channel_osnet_x1_0(num_classes=1000, pretrained=True, loss='softmax', **kwargs):
     # standard size (width x1.0)
     model = OSNet(num_classes, blocks=[OSBlock, OSBlock, OSBlock], layers=[2, 2, 2],
                   channels=[64, 256, 384, 512], loss=loss, **kwargs)

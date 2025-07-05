@@ -9,9 +9,9 @@ from torch.nn import functional as F
 from torch.autograd import Variable
 
 
-class LMBN_n_teacher_5(nn.Module):
+class LMBN_n_par_3(nn.Module):
     def __init__(self, args):
-        super(LMBN_n_teacher_5, self).__init__()
+        super(LMBN_n_par_3, self).__init__()
 
         self.n_ch = 2
         self.chs = 512 // self.n_ch
@@ -35,9 +35,8 @@ class LMBN_n_teacher_5(nn.Module):
 
         self.channel_branch = nn.Sequential(copy.deepcopy(
             conv3), copy.deepcopy(osnet.conv4), copy.deepcopy(osnet.conv5))
-
-        self.global_pooling = nn.AdaptiveAvgPool2d((1, 1))
-        self.partial_pooling = nn.AdaptiveAvgPool2d((2, 1))
+        self.global_pooling = nn.AdaptiveMaxPool2d((1, 1))
+        self.partial_pooling = nn.AdaptiveAvgPool2d((12, 1))
         self.channel_pooling = nn.AdaptiveAvgPool2d((1, 1))
 
         reduction = BNNeck3(512, args.num_classes,
@@ -48,6 +47,8 @@ class LMBN_n_teacher_5(nn.Module):
         self.reduction_2 = copy.deepcopy(reduction)
         self.reduction_3 = copy.deepcopy(reduction)
         self.reduction_4 = copy.deepcopy(reduction)
+
+        self.reduction_5 = copy.deepcopy(reduction)
 
         self.shared = nn.Sequential(nn.Conv2d(
             self.chs, args.feats, 1, bias=False), nn.BatchNorm2d(args.feats), nn.ReLU(True))
@@ -71,13 +72,11 @@ class LMBN_n_teacher_5(nn.Module):
     def forward(self, x):
         # if self.batch_drop_block is not None:
         #     x = self.batch_drop_block(x)
-
         x = self.backone(x)
 
         glo = self.global_branch(x)
         par = self.partial_branch(x)
         cha = self.channel_branch(x)
-
         if self.activation_map:
             glo_ = glo
 
@@ -102,14 +101,20 @@ class LMBN_n_teacher_5(nn.Module):
         p_par = self.partial_pooling(par)  # shape:(batchsize, 512,2,1)
         cha = self.channel_pooling(cha)  # shape:(batchsize, 256,1,1)
 
-        p0 = p_par[:, :, 0:1, :]
-        p1 = p_par[:, :, 1:2, :]
+        p_head = p_par[:, :, 0:2, :]
+        p_upper = p_par[:, :, 2:7, :]
+        p_lower = p_par[:, :, 7:12, :]
+
+        p_head = F.adaptive_avg_pool2d(p_head, (1, 1))
+        p_upper = F.adaptive_avg_pool2d(p_upper, (1, 1))
+        p_lower = F.adaptive_avg_pool2d(p_lower, (1, 1))
 
         f_glo = self.reduction_0(glo)
         f_p0 = self.reduction_1(g_par)
-        f_p1 = self.reduction_2(p0)
-        f_p2 = self.reduction_3(p1)
-        f_glo_drop = self.reduction_4(glo_drop)
+        f_p1 = self.reduction_2(p_head)
+        f_p2 = self.reduction_3(p_upper)
+        f_p3 = self.reduction_4(p_lower)
+        f_glo_drop = self.reduction_5(glo_drop)
 
         ################
 
@@ -126,10 +131,10 @@ class LMBN_n_teacher_5(nn.Module):
 
         if not self.training:
 
-            return torch.stack([f_glo[0], f_glo_drop[0], f_p0[0], f_p1[0], f_p2[0], f_c0[0], f_c1[0]], dim=2)
+            return torch.stack([f_glo[0], f_glo_drop[0], f_p0[0], f_p1[0], f_p2[0], f_p3[0], f_c0[0], f_c1[0]], dim=2)
             # return torch.stack([f_glo_drop[0], f_p0[0], f_p1[0], f_p2[0], f_c0[0], f_c1[0]], dim=2)
 
-        return [f_glo[1], f_glo_drop[1], f_p0[1], f_p1[1], f_p2[1], f_c0[1], f_c1[1]], fea
+        return [f_glo[1], f_glo_drop[1], f_p0[1], f_p1[1], f_p2[1], f_p3[1], f_c0[1], f_c1[1]], fea
 
     def weights_init_kaiming(self, m):
         classname = m.__class__.__name__

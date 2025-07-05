@@ -26,18 +26,23 @@ class checkpoint():
         now = datetime.datetime.now().strftime('%Y-%m-%d-%H-%M-%S')
         self.loss_history = []  # 매 epoch 평균 loss를 여기에 append
 
+
+
+
         def _make_dir(path):
             if not os.path.exists(path):
                 os.makedirs(path)
 
         ROOT_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 
+
+
         if args.load == '':
             if args.save == '':
                 args.save = now
-            self.dir = '/content/gdrive/MyDrive/SAVE' + '/experiment/' + args.save
+            self.dir = ROOT_PATH + '/experiment/' + args.save
         else:
-            self.dir = '/content/gdrive/MyDrive/SAVE' + '/experiment/' + args.save
+            self.dir = ROOT_PATH + '/experiment/' + args.load
             if not os.path.exists(self.dir):
                 args.load = ''
             args.save = args.load
@@ -72,7 +77,7 @@ class checkpoint():
         open_type = 'a' if os.path.exists(log_path) else 'w'
         self.log_file = open(log_path, open_type)
 
-        try:
+        try:              #Neptune 관련 코드인데 지워도 무방
             exp = neptune.init(args.nep_name, args.nep_token)
             if args.load == '':
                 self.exp = exp.create_experiment(name=self.dir.split('/')[-1],
@@ -107,7 +112,7 @@ class checkpoint():
         # epoch 번호를 빼고 고정된 이름으로
         fname = f'{self.args.model}_{self.args.data_train}_{self.fold}_loss_curve.pdf'
         plt.savefig(os.path.join(self.dir, fname), dpi=600)
-        plt.close(fig)            
+        plt.close(fig)
 
     def add_log(self, log):
         self.log = torch.cat([self.log, log])

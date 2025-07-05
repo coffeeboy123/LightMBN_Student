@@ -16,7 +16,7 @@ class LMBN_n_student_8(nn.Module):
         self.n_ch = 2
         self.chs = 512 // self.n_ch
 
-        osnet = osnet_x1_0(pretrained=True)
+        osnet = osnet_x0_25(pretrained=True)
 
         self.backone = nn.Sequential(
             osnet.conv1,
@@ -24,7 +24,7 @@ class LMBN_n_student_8(nn.Module):
             osnet.conv2
         )
 
-        self.global_branch = nn.Sequential(copy.deepcopy(osnet.conv1), LightConv3x3(64, 128), copy.deepcopy(osnet.maxpool),LightConv3x3(128, 256),
+        self.global_branch = nn.Sequential(LightConv3x3(64, 128), copy.deepcopy(osnet.maxpool),LightConv3x3(128, 256),
                                            LightConv3x3(256, 512))
 
         self.partial_branch =  nn.Sequential(copy.deepcopy(osnet.conv1), LightConv3x3(64, 128), copy.deepcopy(osnet.maxpool),LightConv3x3(128, 256),
@@ -69,7 +69,7 @@ class LMBN_n_student_8(nn.Module):
         # if self.batch_drop_block is not None:
         #     x = self.batch_drop_block(x)
 
-        #x = self.backone(x)
+        x = self.backone(x)
 
         glo = self.global_branch(x)
         par = self.partial_branch(x)

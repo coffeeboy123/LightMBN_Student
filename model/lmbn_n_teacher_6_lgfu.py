@@ -27,13 +27,13 @@ class LMBN_n_teacher_6_lgfu(nn.Module):
 
 
 
-        self.global_branch = nn.Sequential(copy.deepcopy(osnet.conv1), copy.deepcopy(osnet.maxpool), 
+        self.global_branch = nn.Sequential(copy.deepcopy(osnet.conv1), copy.deepcopy(osnet.maxpool),
                                            copy.deepcopy(osnet.conv2),copy.deepcopy(osnet.conv3), copy.deepcopy(osnet.conv4), copy.deepcopy(osnet.conv5))
 
-        self.partial_branch = nn.Sequential(copy.deepcopy(osnet.conv1), copy.deepcopy(osnet.maxpool), 
+        self.partial_branch = nn.Sequential(copy.deepcopy(osnet.conv1), copy.deepcopy(osnet.maxpool),
                                            copy.deepcopy(osnet.conv2),copy.deepcopy(osnet.conv3), copy.deepcopy(osnet.conv4), copy.deepcopy(osnet.conv5))
 
-        self.channel_branch = nn.Sequential(copy.deepcopy(osnet.conv1), copy.deepcopy(osnet.maxpool), 
+        self.channel_branch = nn.Sequential(copy.deepcopy(osnet.conv1), copy.deepcopy(osnet.maxpool),
                                            copy.deepcopy(osnet.conv2),copy.deepcopy(osnet.conv3), copy.deepcopy(osnet.conv4), copy.deepcopy(osnet.conv5))
 
         self.global_pooling = nn.AdaptiveMaxPool2d((1, 1))
@@ -175,7 +175,7 @@ if __name__ == '__main__':
     output = net(input)
     print(output.shape)
     print('net output size:')
-    # print(len(output))
+    # print(len(output))    H
     # for k in output[0]:
     #     print(k.shape)
     # for k in output[1]:

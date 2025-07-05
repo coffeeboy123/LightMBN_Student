@@ -1,39 +1,50 @@
 import copy
 import torch
 from torch import nn
-from .osnet import osnet_x1_0, OSBlock
+from .osnet import osnet_x1_0, OSBlock, osnet_x0_25
 from .attention import BatchDrop, BatchFeatureErase_Top, PAM_Module, CAM_Module, SE_Module, Dual_Module
 from .bnneck import BNNeck, BNNeck3
 from torch.nn import functional as F
-from .mambablock import MambaBlock
-
 
 from torch.autograd import Variable
 
 
-class LMBN_n_teacher_6_mamba(nn.Module):
+class LMBN_n_student_3(nn.Module):
     def __init__(self, args):
-        super(LMBN_n_teacher_6_mamba, self).__init__()
+        super(LMBN_n_student_3, self).__init__()
 
         self.n_ch = 2
         self.chs = 512 // self.n_ch
 
-        osnet = osnet_x1_0(pretrained=True)
+        osnet = osnet_x0_25(pretrained=True)
 
-        self.mamba_block = MambaBlock(d_model=args.feats)
+        self.backone = nn.Sequential(
+            osnet.conv1,
+            osnet.maxpool,
+            nn.Conv2d(16, 64, kernel_size=1, bias=False),
+            nn.BatchNorm2d(64),
+            nn.ReLU(inplace=True)
+        )
 
-        
 
-        self.global_branch = nn.Sequential(copy.deepcopy(osnet.conv1), copy.deepcopy(osnet.maxpool), 
-                                           copy.deepcopy(osnet.conv2),copy.deepcopy(osnet.conv3), copy.deepcopy(osnet.conv4), copy.deepcopy(osnet.conv5))
 
-        self.partial_branch = nn.Sequential(copy.deepcopy(osnet.conv1), copy.deepcopy(osnet.maxpool), 
-                                           copy.deepcopy(osnet.conv2),copy.deepcopy(osnet.conv3), copy.deepcopy(osnet.conv4), copy.deepcopy(osnet.conv5))
+        self.global_branch = nn.Sequential(copy.deepcopy(osnet.conv3),
+                                           nn.Conv2d(96, 512, kernel_size=1),
+                                           nn.BatchNorm2d(512),
+                                           nn.ReLU(inplace=True))
 
-        self.channel_branch = nn.Sequential(copy.deepcopy(osnet.conv1), copy.deepcopy(osnet.maxpool), 
-                                           copy.deepcopy(osnet.conv2),copy.deepcopy(osnet.conv3), copy.deepcopy(osnet.conv4), copy.deepcopy(osnet.conv5))
 
-        self.global_pooling = nn.AdaptiveMaxPool2d((1, 1))
+        self.partial_branch = nn.Sequential(copy.deepcopy(osnet.conv3),
+                                           nn.Conv2d(96, 512, kernel_size=1),
+                                           nn.BatchNorm2d(512),
+                                           nn.ReLU(inplace=True))
+
+        self.channel_branch = nn.Sequential(copy.deepcopy(osnet.conv3),
+                                           nn.Conv2d(96, 512, kernel_size=1),
+                                           nn.BatchNorm2d(512),
+                                           nn.ReLU(inplace=True))
+
+        self.global_pooling = nn.AdaptiveAvgPool2d((1, 1))
         self.partial_pooling = nn.AdaptiveAvgPool2d((2, 1))
         self.channel_pooling = nn.AdaptiveAvgPool2d((1, 1))
 
@@ -69,6 +80,7 @@ class LMBN_n_teacher_6_mamba(nn.Module):
         # if self.batch_drop_block is not None:
         #     x = self.batch_drop_block(x)
 
+        x = self.backone(x)
 
         glo = self.global_branch(x)
         par = self.partial_branch(x)
@@ -96,10 +108,7 @@ class LMBN_n_teacher_6_mamba(nn.Module):
         glo = self.channel_pooling(glo)  # shape:(batchsize, 512,1,1)
         g_par = self.global_pooling(par)  # shape:(batchsize, 512,1,1)
         p_par = self.partial_pooling(par)  # shape:(batchsize, 512,2,1)
-        cha_pool = self.channel_pooling(cha)  # → (B, 512, 1, 1)
-        cha_flat = cha_pool.view(cha_pool.size(0), cha_pool.size(1), 1)  # → (B, 512, 1)
-        cha_mamba = self.mamba_block(cha_flat)  # → (B, 512, 1)
-        cha_out = cha_mamba.view(cha_mamba.size(0), cha_mamba.size(1), 1, 1)  # → (B, 512, 1, 1)
+        cha = self.channel_pooling(cha)  # shape:(batchsize, 256,1,1)
 
         p0 = p_par[:, :, 0:1, :]
         p1 = p_par[:, :, 1:2, :]
@@ -112,8 +121,8 @@ class LMBN_n_teacher_6_mamba(nn.Module):
 
         ################
 
-        c0 = cha_out[:, :self.chs, :, :]
-        c1 = cha_out[:, self.chs:, :, :]
+        c0 = cha[:, :self.chs, :, :]
+        c1 = cha[:, self.chs:, :, :]
         c0 = self.shared(c0)
         c1 = self.shared(c1)
         f_c0 = self.reduction_ch_0(c0)

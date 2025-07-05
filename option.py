@@ -12,17 +12,17 @@ parser.add_argument("--config", type=str, default="", help='config path')
 
 
 parser.add_argument("--datadir", type=str,
-                    default="D:/LightMBN-master/ReIDataset_SYSU_A", help='dataset directory root')
+                    default="C:/Users/Howon_LEE/Desktop/Hard_Data/ReIDataset_Reg_A", help='dataset directory root')
 parser.add_argument('--data_train', type=str,
-                    default='SYSU', help='train dataset name')
+                    default='REGDB', help='train dataset name')
 parser.add_argument('--data_test', type=str,
-                    default='SYSU', help='test dataset name')
+                    default='REGDB', help='test dataset name')
 parser.add_argument('--cuhk03_labeled', action='store_true',
                     help='if raise, use cuhk03-labeled dataset, otherwise cuhk03-detected dataset')
 
-parser.add_argument("--epochs", type=int, default=40,
+parser.add_argument("--epochs", type=int, default=70,
                     help='number of epochs to train')
-parser.add_argument('--test_every', type=int, default=2,
+parser.add_argument('--test_every', type=int, default=1,
                     help='do test per every N epochs')
 parser.add_argument("--batchid", type=int, default=6, help='the batch for id')
 parser.add_argument("--batchimage", type=int, default=2,
@@ -98,7 +98,7 @@ parser.add_argument("--w_cosine_annealing", action='store_true',
 
 
 parser.add_argument('--parts', type=int, default=6, help='parts of PCB model')
-parser.add_argument("--margin", type=float, default=0.7, help='')
+parser.add_argument("--margin", type=float, default=0.8, help='')
 parser.add_argument("--re_rank", action='store_true',
                     help='if raise, use re-ranking')
 parser.add_argument("--cutout", action='store_true',
@@ -131,13 +131,13 @@ parser.add_argument('--reset', action='store_true', help='reset the training')
 # for wandb
 parser.add_argument('--wandb', action='store_true', help='use wandb')
 parser.add_argument('--wandb_name', type=str, default='', help='wandb project name')
+
 parser.add_argument(
     '--seed',
     type=int,
     default=251,
     help='random seed for reproducibility (default: 42)'
 )
-
 
 
 args = parser.parse_args()

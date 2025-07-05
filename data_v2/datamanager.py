@@ -12,7 +12,8 @@ from .datasets import init_image_dataset, init_video_dataset
 Speed Up Dataloader
 
 """
-from prefetch_generator import BackgroundGenerator
+from prefetch_generator import BackgroundGenerator  # 원래 주석 풀려있었음
+
 
 class DataloaderX(torch.utils.data.DataLoader):
 

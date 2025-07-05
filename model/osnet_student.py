@@ -96,8 +96,8 @@ class LightConv3x3(nn.Module):
 
     def __init__(self, in_channels, out_channels):
         super(LightConv3x3, self).__init__()
-        self.conv1 = nn.Conv2d(in_channels, out_channels, 1, stride=1, padding=0, bias=False)
-        self.conv2 = nn.Conv2d(out_channels, out_channels, 3, stride=1, padding=1, bias=False, groups=out_channels)
+        self.conv1 = nn.Conv2d(in_channels, in_channels, 3, stride=1, padding=1, bias=False, groups=in_channels)
+        self.conv2 = nn.Conv2d(in_channels, out_channels, 1, stride=1, padding=0, bias=False)
         self.bn = nn.BatchNorm2d(out_channels)
         self.relu = nn.ReLU(inplace=True)
 
@@ -397,10 +397,10 @@ def osnet_x1_25(num_classes=1000, pretrained=True, loss='softmax', **kwargs):
     if pretrained:
         init_pretrained_weights(model, key='osnet_x1_25')
 
-def osnet_x1_0(num_classes=1000, pretrained=True, loss='softmax', **kwargs):
+def osnet_x1_0_student(num_classes=1000, pretrained=True, loss='softmax', **kwargs):
     # standard size (width x1.0)
-    model = OSNet(num_classes, blocks=[OSBlock, OSBlock, OSBlock], layers=[2, 2, 2],
-                  channels=[64, 256, 384, 512], loss=loss, **kwargs)
+    model = OSNet(num_classes, blocks=[OSBlock, OSBlock, OSBlock], layers=[1, 1, 1],
+                  channels=[16, 64, 128, 256], loss=loss, **kwargs)
     if pretrained:
         init_pretrained_weights(model, key='osnet_x1_0')
     return model

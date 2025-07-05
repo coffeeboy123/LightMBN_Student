@@ -2,6 +2,7 @@ import copy
 import torch
 from torch import nn
 from .osnet import osnet_x1_0, OSBlock
+from .channel_osnet import channel_osnet_x1_0
 from .attention import BatchDrop, BatchFeatureErase_Top, PAM_Module, CAM_Module, SE_Module, Dual_Module
 from .bnneck import BNNeck, BNNeck3
 from torch.nn import functional as F
@@ -9,35 +10,29 @@ from torch.nn import functional as F
 from torch.autograd import Variable
 
 
-class LMBN_n_teacher_4(nn.Module):
+class LMBN_n_teacher_6_par_3(nn.Module):
     def __init__(self, args):
-        super(LMBN_n_teacher_4, self).__init__()
+        super(LMBN_n_teacher_6_par_3, self).__init__()
 
         self.n_ch = 2
         self.chs = 512 // self.n_ch
 
         osnet = osnet_x1_0(pretrained=True)
+        channel_osnet = channel_osnet_x1_0()
 
-        self.backone = nn.Sequential(
-            osnet.conv1,
-            osnet.maxpool,
-            osnet.conv2,
-            osnet.conv3[0]
-        )
 
-        conv3 = osnet.conv3[1:]
 
-        self.global_branch = nn.Sequential(copy.deepcopy(
-            conv3), copy.deepcopy(osnet.conv4), copy.deepcopy(osnet.conv5))
+        self.global_branch = nn.Sequential(copy.deepcopy(osnet.conv1), copy.deepcopy(osnet.maxpool),
+                                           copy.deepcopy(osnet.conv2),copy.deepcopy(osnet.conv3), copy.deepcopy(osnet.conv4), copy.deepcopy(osnet.conv5))
 
-        self.partial_branch = nn.Sequential(copy.deepcopy(
-            conv3), copy.deepcopy(osnet.conv4), copy.deepcopy(osnet.conv5))
+        self.partial_branch = nn.Sequential(copy.deepcopy(osnet.conv1), copy.deepcopy(osnet.maxpool),
+                                           copy.deepcopy(osnet.conv2),copy.deepcopy(osnet.conv3), copy.deepcopy(osnet.conv4), copy.deepcopy(osnet.conv5))
 
-        self.channel_branch = nn.Sequential(copy.deepcopy(
-            conv3), copy.deepcopy(osnet.conv4), copy.deepcopy(osnet.conv5))
+        self.channel_branch = nn.Sequential(copy.deepcopy(channel_osnet.conv1), copy.deepcopy(channel_osnet.maxpool),
+                                           copy.deepcopy(channel_osnet.conv2),copy.deepcopy(channel_osnet.conv3), copy.deepcopy(channel_osnet.conv4), copy.deepcopy(channel_osnet.conv5))
 
-        self.global_pooling = nn.AdaptiveAvgPool2d((1, 1))
-        self.partial_pooling = nn.AdaptiveAvgPool2d((2, 1))
+        self.global_pooling = nn.AdaptiveMaxPool2d((1, 1))
+        self.partial_pooling = nn.AdaptiveAvgPool2d((12, 1))
         self.channel_pooling = nn.AdaptiveAvgPool2d((1, 1))
 
         reduction = BNNeck3(512, args.num_classes,
@@ -49,13 +44,11 @@ class LMBN_n_teacher_4(nn.Module):
         self.reduction_3 = copy.deepcopy(reduction)
         self.reduction_4 = copy.deepcopy(reduction)
 
-        self.ch0_pointwise = nn.Sequential(nn.Conv2d(
-            self.chs, args.feats, 1, bias=False), nn.BatchNorm2d(args.feats), nn.ReLU(True))
-        self.weights_init_kaiming(self.ch0_pointwise)
+        self.reduction_5 = copy.deepcopy(reduction)
 
-        self.ch1_pointwise = nn.Sequential(nn.Conv2d(
+        self.shared = nn.Sequential(nn.Conv2d(
             self.chs, args.feats, 1, bias=False), nn.BatchNorm2d(args.feats), nn.ReLU(True))
-        self.weights_init_kaiming(self.ch1_pointwise)
+        self.weights_init_kaiming(self.shared)
 
         self.reduction_ch_0 = BNNeck(
             args.feats, args.num_classes, return_f=True)
@@ -76,7 +69,6 @@ class LMBN_n_teacher_4(nn.Module):
         # if self.batch_drop_block is not None:
         #     x = self.batch_drop_block(x)
 
-        x = self.backone(x)
 
         glo = self.global_branch(x)
         par = self.partial_branch(x)
@@ -106,34 +98,40 @@ class LMBN_n_teacher_4(nn.Module):
         p_par = self.partial_pooling(par)  # shape:(batchsize, 512,2,1)
         cha = self.channel_pooling(cha)  # shape:(batchsize, 256,1,1)
 
-        p0 = p_par[:, :, 0:1, :]
-        p1 = p_par[:, :, 1:2, :]
+        p_head = p_par[:, :, 0:2, :]
+        p_upper = p_par[:, :, 2:7, :]
+        p_lower = p_par[:, :, 7:12, :]
+
+        p_head = F.adaptive_avg_pool2d(p_head, (1, 1))
+        p_upper = F.adaptive_avg_pool2d(p_upper, (1, 1))
+        p_lower = F.adaptive_avg_pool2d(p_lower, (1, 1))
 
         f_glo = self.reduction_0(glo)
         f_p0 = self.reduction_1(g_par)
-        f_p1 = self.reduction_2(p0)
-        f_p2 = self.reduction_3(p1)
-        f_glo_drop = self.reduction_4(glo_drop)
+        f_p1 = self.reduction_2(p_head)
+        f_p2 = self.reduction_3(p_upper)
+        f_p3 = self.reduction_4(p_lower)
+        f_glo_drop = self.reduction_5(glo_drop)
 
         ################
 
         c0 = cha[:, :self.chs, :, :]
         c1 = cha[:, self.chs:, :, :]
-        c0 = self.ch0_pointwise(c0)
-        c1 = self.ch1_pointwise(c1)
+        c0 = self.shared(c0)
+        c1 = self.shared(c1)
         f_c0 = self.reduction_ch_0(c0)
         f_c1 = self.reduction_ch_1(c1)
 
         ################
 
-        fea = [f_glo[-1], f_glo_drop[-1], f_p0[-1], f_p1[-1], f_p2[-1], f_c0[-1], f_c1[-1]]
+        fea = [f_glo[-1], f_glo_drop[-1], f_p0[-1]]
 
         if not self.training:
 
-            return torch.stack([f_glo[0], f_glo_drop[0], f_p0[0], f_p1[0], f_p2[0], f_c0[0], f_c1[0]], dim=2)
+            return torch.stack([f_glo[0], f_glo_drop[0], f_p0[0], f_p1[0], f_p2[0], f_p3[0], f_c0[0], f_c1[0]], dim=2)
             # return torch.stack([f_glo_drop[0], f_p0[0], f_p1[0], f_p2[0], f_c0[0], f_c1[0]], dim=2)
 
-        return [f_glo[1], f_glo_drop[1], f_p0[1], f_p1[1], f_p2[1], f_c0[1], f_c1[1]], fea
+        return [f_glo[1], f_glo_drop[1], f_p0[1], f_p1[1], f_p2[1], f_p3[1], f_c0[1], f_c1[1]], fea
 
     def weights_init_kaiming(self, m):
         classname = m.__class__.__name__

@@ -1,42 +1,42 @@
 import copy
 import torch
 from torch import nn
-from .osnet import osnet_x1_0, OSBlock
+from .osnet import osnet_x1_0, OSBlock, osnet_x0_25, LightConv3x3
 from .attention import BatchDrop, BatchFeatureErase_Top, PAM_Module, CAM_Module, SE_Module, Dual_Module
-from .bnneck import BNNeck, BNNeck3
+from .bnneck import BNNeck, BNNeck3_depthwise
 from torch.nn import functional as F
 
 from torch.autograd import Variable
 
 
-class LMBN_n_teacher_6_fake_quant_data(nn.Module):
+class LMBN_n_student_2_12(nn.Module):
     def __init__(self, args):
-        super(LMBN_n_teacher_6_fake_quant_data, self).__init__()
-
-        self.quant = torch.quantization.QuantStub()  # 양자화 적용
-        self.dequant = torch.quantization.DeQuantStub()  # 양자화 해제
+        super(LMBN_n_student_2_12, self).__init__()
 
         self.n_ch = 2
         self.chs = 512 // self.n_ch
 
-        osnet = osnet_x1_0(pretrained=True)
+        osnet = osnet_x0_25(pretrained=True)
 
+        self.backone = nn.Sequential(
+            osnet.conv1,
+            osnet.maxpool,
+            osnet.conv2
+        )
 
+        self.global_branch = nn.Sequential(copy.deepcopy(osnet.conv3), copy.deepcopy(osnet.conv4),
+                                           copy.deepcopy(osnet.conv5))
 
-        self.global_branch = nn.Sequential(copy.deepcopy(osnet.conv1), copy.deepcopy(osnet.maxpool),
-                                           copy.deepcopy(osnet.conv2),copy.deepcopy(osnet.conv3), copy.deepcopy(osnet.conv4), copy.deepcopy(osnet.conv5))
+        self.partial_branch = nn.Sequential(copy.deepcopy(osnet.conv3), copy.deepcopy(osnet.conv4),
+                                           copy.deepcopy(osnet.conv5))
 
-        self.partial_branch = nn.Sequential(copy.deepcopy(osnet.conv1), copy.deepcopy(osnet.maxpool),
-                                           copy.deepcopy(osnet.conv2),copy.deepcopy(osnet.conv3), copy.deepcopy(osnet.conv4), copy.deepcopy(osnet.conv5))
-
-        self.channel_branch = nn.Sequential(copy.deepcopy(osnet.conv1), copy.deepcopy(osnet.maxpool),
-                                           copy.deepcopy(osnet.conv2),copy.deepcopy(osnet.conv3), copy.deepcopy(osnet.conv4), copy.deepcopy(osnet.conv5))
-
+        self.channel_branch = nn.Sequential(copy.deepcopy(osnet.conv3), copy.deepcopy(osnet.conv4),
+                                           copy.deepcopy(osnet.conv5))
         self.global_pooling = nn.AdaptiveAvgPool2d((1, 1))
         self.partial_pooling = nn.AdaptiveAvgPool2d((2, 1))
         self.channel_pooling = nn.AdaptiveAvgPool2d((1, 1))
 
-        reduction = BNNeck3(512, args.num_classes,
+        reduction = BNNeck3_depthwise(512, args.num_classes,
                             args.feats, return_f=True)
 
         self.reduction_0 = copy.deepcopy(reduction)
@@ -46,7 +46,7 @@ class LMBN_n_teacher_6_fake_quant_data(nn.Module):
         self.reduction_4 = copy.deepcopy(reduction)
 
         self.shared = nn.Sequential(nn.Conv2d(
-            self.chs, args.feats, 1, bias=False), nn.BatchNorm2d(args.feats), nn.ReLU(True))
+            self.chs, args.feats, 1, bias=False, groups= 256), nn.BatchNorm2d(args.feats), nn.ReLU(True))
         self.weights_init_kaiming(self.shared)
 
         self.reduction_ch_0 = BNNeck(
@@ -64,16 +64,11 @@ class LMBN_n_teacher_6_fake_quant_data(nn.Module):
 
         self.activation_map = args.activation_map
 
-    def dequantize_if_needed(self, t):
-        if isinstance(t, tuple):
-            return (self.dequant(t[0]),) + t[1:]
-        else:
-            return self.dequant(t)
-
     def forward(self, x):
         # if self.batch_drop_block is not None:
         #     x = self.batch_drop_block(x)
-        x = self.quant(x)
+
+        x = self.backone(x)
 
         glo = self.global_branch(x)
         par = self.partial_branch(x)
@@ -107,19 +102,10 @@ class LMBN_n_teacher_6_fake_quant_data(nn.Module):
         p1 = p_par[:, :, 1:2, :]
 
         f_glo = self.reduction_0(glo)
-        f_glo = self.dequantize_if_needed(f_glo)
-
         f_p0 = self.reduction_1(g_par)
-        f_p0 = self.dequantize_if_needed(f_p0)
-
         f_p1 = self.reduction_2(p0)
-        f_p1 = self.dequantize_if_needed(f_p1)
-
         f_p2 = self.reduction_3(p1)
-        f_p2 = self.dequantize_if_needed(f_p2)
-
         f_glo_drop = self.reduction_4(glo_drop)
-        f_glo_drop = self.dequantize_if_needed(f_glo_drop)
 
         ################
 
@@ -128,10 +114,7 @@ class LMBN_n_teacher_6_fake_quant_data(nn.Module):
         c0 = self.shared(c0)
         c1 = self.shared(c1)
         f_c0 = self.reduction_ch_0(c0)
-        f_c0 = self.dequantize_if_needed(f_c0)
-
         f_c1 = self.reduction_ch_1(c1)
-        f_c1 = self.dequantize_if_needed(f_c1)
 
         ################
 

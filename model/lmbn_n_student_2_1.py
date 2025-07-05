@@ -1,42 +1,52 @@
 import copy
 import torch
 from torch import nn
-from .osnet import osnet_x1_0, OSBlock
+from .osnet import osnet_x1_0, OSBlock, osnet_x0_25
 from .attention import BatchDrop, BatchFeatureErase_Top, PAM_Module, CAM_Module, SE_Module, Dual_Module
-from .bnneck import BNNeck, BNNeck3
+from .bnneck import BNNeck, BNNeck3_depthwise
 from torch.nn import functional as F
 
 from torch.autograd import Variable
 
-from .channelrelationreasoning import ChannelRelationReasoning
 
-
-class LMBN_n_teacher_6_channelrelation(nn.Module):
+class LMBN_n_student_2_1(nn.Module):
     def __init__(self, args):
-        super(LMBN_n_teacher_6_channelrelation, self).__init__()
+        super(LMBN_n_student_2_1, self).__init__()
 
         self.n_ch = 2
         self.chs = 512 // self.n_ch
 
-        osnet = osnet_x1_0(pretrained=True)
+        osnet = osnet_x0_25(pretrained=True)
 
-        self.channel_relation = ChannelRelationReasoning(channels=512)
+        self.backone = nn.Sequential(
+            osnet.conv1,
+            osnet.maxpool,
+            osnet.conv2
+        )
 
 
-        self.global_branch = nn.Sequential(copy.deepcopy(osnet.conv1), copy.deepcopy(osnet.maxpool), 
-                                           copy.deepcopy(osnet.conv2),copy.deepcopy(osnet.conv3), copy.deepcopy(osnet.conv4), copy.deepcopy(osnet.conv5))
 
-        self.partial_branch = nn.Sequential(copy.deepcopy(osnet.conv1), copy.deepcopy(osnet.maxpool), 
-                                           copy.deepcopy(osnet.conv2),copy.deepcopy(osnet.conv3), copy.deepcopy(osnet.conv4), copy.deepcopy(osnet.conv5))
+        self.global_branch = nn.Sequential(copy.deepcopy(osnet.conv3), copy.deepcopy(osnet.conv3),
+                                           nn.Conv2d(128, 512, kernel_size=1, groups=128),
+                                           nn.BatchNorm2d(512),
+                                           nn.ReLU(inplace=True))
 
-        self.channel_branch = nn.Sequential(copy.deepcopy(osnet.conv1), copy.deepcopy(osnet.maxpool), 
-                                           copy.deepcopy(osnet.conv2),copy.deepcopy(osnet.conv3), copy.deepcopy(osnet.conv4), copy.deepcopy(osnet.conv5))
 
-        self.global_pooling = nn.AdaptiveMaxPool2d((1, 1))
+        self.partial_branch = nn.Sequential(copy.deepcopy(osnet.conv3), copy.deepcopy(osnet.conv3),
+                                           nn.Conv2d(128, 512, kernel_size=1, groups=128),
+                                           nn.BatchNorm2d(512),
+                                           nn.ReLU(inplace=True))
+
+        self.channel_branch = nn.Sequential(copy.deepcopy(osnet.conv3), copy.deepcopy(osnet.conv3),
+                                           nn.Conv2d(128, 512, kernel_size=1, groups=128),
+                                           nn.BatchNorm2d(512),
+                                           nn.ReLU(inplace=True))
+
+        self.global_pooling = nn.AdaptiveAvgPool2d((1, 1))
         self.partial_pooling = nn.AdaptiveAvgPool2d((2, 1))
         self.channel_pooling = nn.AdaptiveAvgPool2d((1, 1))
 
-        reduction = BNNeck3(512, args.num_classes,
+        reduction = BNNeck3_depthwise(512, args.num_classes,
                             args.feats, return_f=True)
 
         self.reduction_0 = copy.deepcopy(reduction)
@@ -68,12 +78,11 @@ class LMBN_n_teacher_6_channelrelation(nn.Module):
         # if self.batch_drop_block is not None:
         #     x = self.batch_drop_block(x)
 
+        x = self.backone(x)
 
         glo = self.global_branch(x)
         par = self.partial_branch(x)
         cha = self.channel_branch(x)
-
-        cha = self.channel_relation(cha)
 
         if self.activation_map:
             glo_ = glo
