@@ -27,8 +27,6 @@ class checkpoint():
         self.loss_history = []  # 매 epoch 평균 loss를 여기에 append
 
 
-
-
         def _make_dir(path):
             if not os.path.exists(path):
                 os.makedirs(path)
