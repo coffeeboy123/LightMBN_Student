@@ -76,6 +76,8 @@ class LMBN_n_vit(nn.Module):
         # if self.batch_drop_block is not None:
         #     x = self.batch_drop_block(x)
 
+        x = self.backone(x)
+
 
         glo = self.global_branch(x)
         par = self.partial_branch(x)
