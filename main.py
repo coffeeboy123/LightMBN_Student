@@ -57,7 +57,9 @@ if __name__ == '__main__':
     while not engine.terminate():
         n += 1
         engine.train()
+        engine.validation()
         if args.test_every != 0 and n % args.test_every == 0:
             engine.test()
         elif n == args.epochs:
             engine.test()
+    engine.close()

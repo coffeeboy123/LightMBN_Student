@@ -25,40 +25,31 @@ class checkpoint():
         self.since = datetime.datetime.now()
         now = datetime.datetime.now().strftime('%Y-%m-%d-%H-%M-%S')
         self.loss_history = []  # 매 epoch 평균 loss를 여기에 append
+        self.validation_loss_history = []
+
+
 
 
         def _make_dir(path):
             if not os.path.exists(path):
                 os.makedirs(path)
 
-        ROOT_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
-
-
-
-        if args.load == '':
-            if args.save == '':
-                args.save = now
-            self.dir = '/content/gdrive/MyDrive/SAVE_again' + '/experiment/' + args.save
-        else:
-            self.dir = '/content/gdrive/MyDrive/SAVE_again' + '/experiment/' + args.save
-            if not os.path.exists(self.dir):
-                args.load = ''
-            args.save = args.load
-
         self.local_dir = None
-        if ROOT_PATH[:11] == '/content/dr':
-            self.dir = osp.join('/content/drive/Shareddrives/Colab',
-                                self.dir[self.dir.find('experiment'):])
-            self.local_dir = ROOT_PATH + '/experiment/' + self.dir.split('/')[-1]
-            _make_dir(self.local_dir)
 
-        _make_dir(self.dir)
+        ROOT_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 
         last_folder = os.path.basename(args.datadir.rstrip('/\\'))
         if '_' in last_folder:
             self.fold = last_folder.split('_')[-1].upper()
         else:
             self.fold = 'A'
+
+        exp_folder = f"{args.model}_{args.data_train}_{self.fold}_{args.batchid}_{args.batchimage}_{args.batchtest}_{args.epochs}"
+        self.dir = os.path.join('/content/gdrive/MyDrive/SAVE_VAL', exp_folder)
+        _make_dir(self.dir)
+
+
+
         self.log_filename = f"{args.model}_{args.data_train}_{self.fold}_{args.batchid}_{args.batchimage}_{args.batchtest}_{args.epochs}_log.txt"
         self.map_log_filename = f"{args.model}_{args.data_train}_{self.fold}_{args.batchid}_{args.batchimage}_{args.batchtest}_{args.epochs}map_log.pt"
         self.config_filename = f"{args.model}_{args.data_train}_{self.fold}_{args.batchid}_{args.batchimage}_{args.batchtest}_{args.epochs}_config.yaml"
@@ -97,20 +88,54 @@ class checkpoint():
         if self.local_dir is not None:
             copyfile(config_path, os.path.join(self.local_dir, self.config_filename))
 
-    def plot_loss(self, epoch):
-        """training loss curve를 PDF로 저장 (한 파일만 덮어쓰기)"""
-        epochs = list(range(1, epoch + 1))
+    def plot_losses(self, train_total, val_total, train_ce, val_ce, train_ms, val_ms):
+        """
+        총 3개 plot을 저장
+          - Total loss: train/val
+          - CE loss: train/val
+          - MS loss: train/val
+        리스트들은 모두 epoch별 평균값 리스트여야 함.
+        """
+        # 1. Total Loss
         fig = plt.figure()
-        plt.plot(epochs, self.loss_history)
-        plt.title(f'{self.args.model} Training Loss')
+        plt.plot(range(1, len(train_total) + 1), train_total, label='Train Total', color='blue')
+        plt.plot(range(1, len(val_total) + 1), val_total, label='Val Total', color='orange')
+        plt.title(f'{self.args.model} Total Loss')
         plt.xlabel('Epoch')
-        plt.ylabel('Average Loss')
+        plt.ylabel('Total Loss')
+        plt.legend()
         plt.grid(True)
-
-        # epoch 번호를 빼고 고정된 이름으로
-        fname = f'{self.args.model}_{self.args.data_train}_{self.fold}_loss_curve.pdf'
-        plt.savefig(os.path.join(self.dir, fname), dpi=600)
+        plt.savefig(os.path.join(self.dir, f'{self.args.model}_{self.args.data_train}_{self.fold}_total_loss.png'),
+                    dpi=600)
         plt.close(fig)
+
+        # 2. CrossEntropy Loss
+        if any(x is not None for x in train_ce):
+            fig = plt.figure()
+            plt.plot(range(1, len(train_ce) + 1), train_ce, label='Train CE', color='blue')
+            plt.plot(range(1, len(val_ce) + 1), val_ce, label='Val CE', color='orange')
+            plt.title(f'{self.args.model} CrossEntropy Loss')
+            plt.xlabel('Epoch')
+            plt.ylabel('CE Loss')
+            plt.legend()
+            plt.grid(True)
+            plt.savefig(os.path.join(self.dir, f'{self.args.model}_{self.args.data_train}_{self.fold}_ce_loss.png'),
+                        dpi=600)
+            plt.close(fig)
+
+        # 3. MS Loss
+        if any(x is not None for x in train_ms):
+            fig = plt.figure()
+            plt.plot(range(1, len(train_ms) + 1), train_ms, label='Train MS', color='blue')
+            plt.plot(range(1, len(val_ms) + 1), val_ms, label='Val MS', color='orange')
+            plt.title(f'{self.args.model} MultiSimilarity Loss')
+            plt.xlabel('Epoch')
+            plt.ylabel('MS Loss')
+            plt.legend()
+            plt.grid(True)
+            plt.savefig(os.path.join(self.dir, f'{self.args.model}_{self.args.data_train}_{self.fold}_ms_loss.png'),
+                        dpi=600)
+            plt.close(fig)
 
     def add_log(self, log):
         self.log = torch.cat([self.log, log])
@@ -156,7 +181,7 @@ class checkpoint():
         plt.ylabel('mAP/rank')
         plt.grid(True)
 
-        pdf_name = f'{self.args.model}_{self.args.data_test}_{self.fold}_result.pdf'
+        pdf_name = f'{self.args.model}_{self.args.data_test}_{self.fold}_result.png'
         plt.savefig(os.path.join(self.dir, pdf_name), dpi=600)
         plt.close(fig)
 

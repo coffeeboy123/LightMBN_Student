@@ -31,6 +31,7 @@ class Engine:
 
         self.args = args
         self.train_loader = loader.train_loader
+        self.validation_loader = loader.validation_loader
         self.test_loader = loader.test_loader
         self.query_loader = loader.query_loader
         self.testset = loader.galleryset
@@ -45,6 +46,11 @@ class Engine:
         self.lr = 0.0
         self.device = torch.device("cpu" if args.cpu else "cuda")
 
+        self.train_ce_loss_history = []
+        self.train_ms_loss_history = []
+        self.val_ce_loss_history = []
+        self.val_ms_loss_history = []
+
         if torch.cuda.is_available():
             self.ckpt.write_log("[INFO] GPU: " + torch.cuda.get_device_name(0))
 
@@ -58,6 +64,9 @@ class Engine:
         else:
             self.wandb = False
 
+        from torch.utils.tensorboard import SummaryWriter
+        self.writer = SummaryWriter(log_dir=self.ckpt.dir)
+
     def train(self):
         epoch = self.scheduler.last_epoch
         lr = self.scheduler.get_last_lr()[0]
@@ -69,6 +78,9 @@ class Engine:
             self.lr = lr
         self.loss.start_log()
         running_loss = 0.0
+        ce_running_loss = 0.0
+        ms_running_loss = 0.0
+
         self.model.train()
 
         for batch, d in enumerate(self.train_loader):
@@ -79,11 +91,15 @@ class Engine:
 
             self.optimizer.zero_grad()
             outputs = self.model(inputs)
-            loss = self.loss.compute(outputs, labels)
+            total_loss, ce_loss, ms_loss = self.loss.compute(outputs, labels)
 
-            running_loss += loss.item()  # ← 추가: tensor → float 로 누적
+            running_loss += total_loss.item()
+            if ce_loss is not None:
+                ce_running_loss += ce_loss
+            if ms_loss is not None:
+                ms_running_loss += ms_loss
 
-            loss.backward()
+            total_loss.backward()
             self.optimizer.step()
 
             self.ckpt.write_log(
@@ -104,12 +120,94 @@ class Engine:
         self.loss.end_log(len(self.train_loader))
 
         avg_loss = running_loss / len(self.train_loader)
+        avg_ce = ce_running_loss / len(self.train_loader) if ce_running_loss != 0 else None
+        avg_ms = ms_running_loss / len(self.train_loader) if ms_running_loss != 0 else None
 
         # checkpoint에 기록
         self.ckpt.loss_history.append(avg_loss)
+        self.train_ce_loss_history.append(avg_ce)
+        self.train_ms_loss_history.append(avg_ms)
+
+        self.writer.add_scalar('Loss/Train_Total', avg_loss, epoch + 1)
+        self.writer.add_scalar('Loss/Train_CE', avg_ce, epoch + 1)
+        self.writer.add_scalar('Loss/Train_MS', avg_ms, epoch + 1)
+
+        self._last_train_loss = avg_loss
+        self._last_train_ce = avg_ce
+        self._last_train_ms = avg_ms
+
+
 
         # loss curve 저장 (원하는 시점에—예: 매 epoch마다)
-        self.ckpt.plot_loss(epoch + 1)
+
+    def validation(self):
+        epoch = self.scheduler.last_epoch
+        running_loss = 0.0
+        ce_running_loss = 0.0
+        ms_running_loss = 0.0
+        self.model.eval()
+
+        with torch.no_grad():  # <- 반드시 감싸주세요!
+            for batch, d in enumerate(self.validation_loader):
+                inputs, labels = self._parse_data_for_train(d)
+                inputs = inputs.to(self.device)
+                labels = labels.to(self.device)
+                outputs = self.model(inputs)
+                total_loss, ce_loss, ms_loss = self.loss.compute(outputs, labels)
+                running_loss += total_loss.item()
+                if ce_loss is not None:
+                    ce_running_loss += ce_loss
+                if ms_loss is not None:
+                    ms_running_loss += ms_loss
+
+
+                self.ckpt.write_log(
+                    "\r[VAL] [{}/{}]\t{}/{}\t{}".format(
+                        epoch,
+                        self.args.epochs,
+                        batch + 1,
+                        len(self.validation_loader),
+                        self.loss.display_loss(batch),
+                    ),
+                    end="" if batch + 1 != len(self.validation_loader) else "\n",
+                )
+
+                if self.wandb and wandb is not None:
+                    wandb.log({"val_loss_step": loss.item()})
+
+        avg_loss = running_loss / len(self.validation_loader)
+        avg_ce = ce_running_loss / len(self.validation_loader) if ce_running_loss != 0 else None
+        avg_ms = ms_running_loss / len(self.validation_loader) if ms_running_loss != 0 else None
+
+        self.ckpt.validation_loss_history.append(avg_loss)
+        self.val_ce_loss_history.append(avg_ce)
+        self.val_ms_loss_history.append(avg_ms)
+
+        self.ckpt.plot_losses(
+            self.ckpt.loss_history,  # total train loss
+            self.ckpt.validation_loss_history,  # total val loss
+            self.train_ce_loss_history,  # ce train loss
+            self.val_ce_loss_history,  # ce val loss
+            self.train_ms_loss_history,  # ms train loss
+            self.val_ms_loss_history,  # ms val loss
+        )
+
+        self.writer.add_scalar('Loss/Val_Total', avg_loss, epoch + 1)
+        self.writer.add_scalar('Loss/Val_CE', avg_ce, epoch + 1)
+        self.writer.add_scalar('Loss/Val_MS', avg_ms, epoch + 1)
+
+        self.writer.add_scalars('Loss/Total', {
+            'Train': self._last_train_loss,
+            'Val': avg_loss
+        }, epoch + 1)
+        self.writer.add_scalars('Loss/CE', {
+            'Train': self._last_train_ce,
+            'Val': avg_ce
+        }, epoch + 1)
+        self.writer.add_scalars('Loss/MS', {
+            'Train': self._last_train_ms,
+            'Val': avg_ms
+        }, epoch + 1)
 
     def test(self):
         epoch = self.scheduler.last_epoch
@@ -201,6 +299,21 @@ class Engine:
                     "rank10": r[9],
                 }
             )
+        # TensorBoard 기록 추가
+        self.writer.add_scalars('Eval/Rank', {
+            'rank1': r[0],
+            'rank3': r[2],
+            'rank5': r[4],
+            'rank10': r[9],
+        }, epoch + 1)
+        self.writer.add_scalar('Eval/mAP', m_ap, epoch + 1)
+
+        self.ckpt.plot_map_rank(epoch + 1)
+
+
+    def close(self):
+        self.writer.close()
+
 
     def fliphor(self, inputs):
         inv_idx = torch.arange(inputs.size(3) - 1, -1, -1).long()  # N x C x H x W
@@ -215,12 +328,12 @@ class Engine:
             input_img = inputs.to(self.device)
             outputs = self.model(input_img)
 
-            f1 = outputs.data.cpu()
+            f1 = outputs[2].data.cpu()
             # flip
             inputs = inputs.index_select(3, torch.arange(inputs.size(3) - 1, -1, -1))
             input_img = inputs.to(self.device)
             outputs = self.model(input_img)
-            f2 = outputs.data.cpu()
+            f2 = outputs[2].data.cpu()
 
             ff = f1 + f2
             if ff.dim() == 3:

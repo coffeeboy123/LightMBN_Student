@@ -32,9 +32,10 @@ class Dataset(object):
     """
     _junk_pids = [] # contains useless person IDs, e.g. background, false detections
 
-    def __init__(self, train, query, gallery, transform=None, mode='train',
+    def __init__(self, train, validation, query, gallery, transform=None, mode='train',
                  combineall=False, verbose=True, **kwargs):
         self.train = train
+        self.validation = validation
         self.query = query
         self.gallery = gallery
         self.transform = transform
@@ -45,11 +46,16 @@ class Dataset(object):
         self.num_train_pids = self.get_num_pids(self.train)
         self.num_train_cams = self.get_num_cams(self.train)
 
+        self.num_validation_pids = self.get_num_pids(self.validation)
+        self.num_validation_cams = self.get_num_cams(self.validation)
+
         if self.combineall:
             self.combine_all()
 
         if self.mode == 'train':
             self.data = self.train
+        elif self.mode == 'validation':
+            self.data = self.validation
         elif self.mode == 'query':
             self.data = self.query
         elif self.mode == 'gallery':
@@ -238,8 +244,8 @@ class ImageDataset(Dataset):
     data in each batch has shape (batch_size, channel, height, width).
     """
 
-    def __init__(self, train, query, gallery, **kwargs):
-        super(ImageDataset, self).__init__(train, query, gallery, **kwargs)
+    def __init__(self, train, validation, query, gallery, **kwargs):
+        super(ImageDataset, self).__init__(train, validation, query, gallery, **kwargs)
 
     def __getitem__(self, index):
         img_path, pid, camid = self.data[index]

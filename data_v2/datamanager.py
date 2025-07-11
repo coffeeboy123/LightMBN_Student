@@ -37,15 +37,22 @@ class DataManager(object):
         use_gpu (bool, optional): use gpu. Default is True.
     """
 
-    def __init__(self, sources=None, targets=None, height=256, width=128, transforms='random_flip',
+    def __init__(self, sources=None, validations=None, targets=None, height=256, width=128, transforms='random_flip',
                  norm_mean=None, norm_std=None, use_gpu=False):
         self.sources = sources
+        self.validations = validations
         self.targets = targets
         self.height = height
         self.width = width
 
         if self.sources is None:
             raise ValueError('sources must not be None')
+
+        if isinstance(self.sources, str):
+            self.sources = [self.sources]
+
+        if self.validations is None:
+            raise ValueError('validations must not be None')
 
         if isinstance(self.sources, str):
             self.sources = [self.sources]
@@ -75,7 +82,7 @@ class DataManager(object):
 
     def return_dataloaders(self):
         """Returns trainloader and testloader."""
-        return self.trainloader, self.testloader
+        return self.trainloader, self.validationloader, self.testloader
 
     def return_testdataset_by_name(self, name):
         """Returns query and gallery of a test dataset, each containing
@@ -134,7 +141,9 @@ class ImageDataManager(DataManager):
     def __init__(self, args):
 
         root = args.datadir
+
         sources = args.data_train.lower().split('+')
+        validations = args.data_validation.lower().split('+')
         targets = args.data_test.lower().split('+')
         height = args.height
         width = args.width
@@ -147,6 +156,7 @@ class ImageDataManager(DataManager):
         split_id = 0
         combineall = False
         batch_size_train = args.batchid * args.batchimage
+        batch_size_validation = args.batchid * args.batchimage
         num_instances = args.batchimage
         batch_size_test = args.batchtest
         workers = args.nThread
@@ -162,7 +172,7 @@ class ImageDataManager(DataManager):
         if args.sampler:
             train_sampler = 'RandomIdentitySampler'
 
-        super(ImageDataManager, self).__init__(sources=sources, targets=targets, height=height, width=width,
+        super(ImageDataManager, self).__init__(sources=sources, validations=validations, targets=targets, height=height, width=width,
                                                transforms=transforms, norm_mean=norm_mean, norm_std=norm_std,
                                                use_gpu=use_gpu)
         print('=> Loading train (source) dataset')
@@ -196,6 +206,43 @@ class ImageDataManager(DataManager):
             trainset,
             sampler=train_sampler,
             batch_size=batch_size_train,
+            shuffle=False,
+            num_workers=workers,
+            pin_memory=self.use_gpu,
+            drop_last=True
+        )
+
+        print('=> Loading validation dataset')
+        validationset = []
+        for name in self.validations:
+            validationset_ = init_image_dataset(
+                name,
+                transform=self.transform_tr,
+                mode='validation',
+                combineall=combineall,
+                root=root,
+                split_id=split_id,
+                cuhk03_labeled=cuhk03_labeled,
+                cuhk03_classic_split=cuhk03_classic_split,
+                market1501_500k=market1501_500k
+            )
+            validationset.append(validationset_)
+        validationset = sum(validationset)
+
+        self._num_validation_pids = validationset.num_validation_pids
+        self._num_validation_cams = validationset.num_validation_cams
+
+        validation_sampler = build_train_sampler(
+            validationset.validation, train_sampler,
+            batch_size=batch_size_validation,
+            num_instances=num_instances
+        )
+
+        # self.train_loader = torch.utils.data.DataLoader(
+        self.validation_loader = DataloaderX(
+            validationset,
+            sampler=validation_sampler,
+            batch_size=batch_size_validation,
             shuffle=False,
             num_workers=workers,
             pin_memory=self.use_gpu,
@@ -268,6 +315,11 @@ class ImageDataManager(DataManager):
         print('  # train ids      : {}'.format(self.num_train_pids))
         print('  # train images   : {}'.format(len(trainset)))
         print('  # train cameras  : {}'.format(self.num_train_cams))
+        print('  validation            : {}'.format(self.validations))
+        print('  # validation datasets : {}'.format(len(self.validations)))
+        print('  # validation ids      : {}'.format(self._num_validation_pids))
+        print('  # validation images   : {}'.format(len(validationset)))
+        print('  # validation cameras  : {}'.format(self._num_validation_cams))
         print('  test             : {}'.format(self.targets))
         print('  # query images   : {}'.format(len(queryset)))
         print('  # gallery images : {}'.format(len(galleryset)))

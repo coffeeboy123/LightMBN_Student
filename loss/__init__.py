@@ -26,6 +26,8 @@ class LossFunction:
         self.nGPU = args.nGPU
         self.args = args
         self.loss = []
+        ce_value = None
+        ms_value = None
         for loss in args.loss.split("+"):
             weight, loss_type = loss.split("*")
             if loss_type == "CrossEntropy":
@@ -79,43 +81,45 @@ class LossFunction:
                 loss = sum(loss)
                 effective_loss = l["weight"] * loss
                 losses.append(effective_loss)
+                ce_value = effective_loss.item()
 
                 self.log[-1, i] += effective_loss.item()
 
             elif l["type"] in ["Triplet", "MSLoss"]:
-                if isinstance(outputs[-1], list):
-                    loss = [l["function"](output, labels) for output in outputs[-1]]
-                elif isinstance(outputs[-1], torch.Tensor):
-                    loss = [l["function"](outputs[-1], labels)]
+                if isinstance(outputs[1], list):
+                    loss = [l["function"](output, labels) for output in outputs[1]]
+                elif isinstance(outputs[1], torch.Tensor):
+                    loss = [l["function"](outputs[1], labels)]
                 else:
-                    raise TypeError("Unexpected type: {}".format(type(outputs[-1])))
+                    raise TypeError("Unexpected type: {}".format(type(outputs[1])))
                 loss = sum(loss)
                 effective_loss = l["weight"] * loss
                 losses.append(effective_loss)
+                ms_value = effective_loss.item()
                 self.log[-1, i] += effective_loss.item()
 
             elif l["type"] in ["GroupLoss"]:
-                if isinstance(outputs[-1], list):
+                if isinstance(outputs[1], list):
                     loss = [
                         l["function"](output[0], labels, output[1])
-                        for output in zip(outputs[-1], outputs[0][:3])
+                        for output in zip(outputs[1], outputs[0][:3])
                     ]
                 elif isinstance(outputs[-1], torch.Tensor):
-                    loss = [l["function"](outputs[-1], labels)]
+                    loss = [l["function"](outputs[1], labels)]
                 else:
-                    raise TypeError("Unexpected type: {}".format(type(outputs[-1])))
+                    raise TypeError("Unexpected type: {}".format(type(outputs[1])))
                 loss = sum(loss)
                 effective_loss = l["weight"] * loss
                 losses.append(effective_loss)
                 self.log[-1, i] += effective_loss.item()
 
             elif l["type"] in ["CenterLoss"]:
-                if isinstance(outputs[-1], list):
-                    loss = [l["function"](output, labels) for output in outputs[-1]]
-                elif isinstance(outputs[-1], torch.Tensor):
-                    loss = [l["function"](outputs[-1], labels)]
+                if isinstance(outputs[1], list):
+                    loss = [l["function"](output, labels) for output in outputs[1]]
+                elif isinstance(outputs[1], torch.Tensor):
+                    loss = [l["function"](outputs[1], labels)]
                 else:
-                    raise TypeError("Unexpected type: {}".format(type(outputs[-1])))
+                    raise TypeError("Unexpected type: {}".format(type(outputs[1])))
 
                 loss = sum(loss)
                 effective_loss = l["weight"] * loss
@@ -127,10 +131,12 @@ class LossFunction:
 
         loss_sum = sum(losses)
 
+
+
         if len(self.loss) > 1:
             self.log[-1, -1] += loss_sum.item()
 
-        return loss_sum
+        return loss_sum, ce_value, ms_value
 
     def start_log(self):
         self.log = torch.cat((self.log, torch.zeros(1, len(self.loss))))

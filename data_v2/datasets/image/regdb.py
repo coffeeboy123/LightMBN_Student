@@ -43,6 +43,7 @@ class RegDB(ImageDataset):
                           '"Market-1501-v15.09.15".')
 
         self.train_dir = osp.join(self.data_dir, 'bounding_box_train')
+        self.validation_dir = osp.join(self.data_dir, 'bounding_box_validation')
         self.query_dir = osp.join(self.data_dir, 'query')
         self.gallery_dir = osp.join(self.data_dir, 'bounding_box_test')
         self.extra_gallery_dir = osp.join(self.data_dir, 'images')
@@ -51,6 +52,7 @@ class RegDB(ImageDataset):
         required_files = [
             self.data_dir,
             self.train_dir,
+            self.validation_dir,
             self.query_dir,
             self.gallery_dir
         ]
@@ -59,12 +61,13 @@ class RegDB(ImageDataset):
         self.check_before_run(required_files)
 
         train = self.process_dir(self.train_dir, relabel=True)
+        validation = self.process_dir(self.validation_dir, relabel=True)
         query = self.process_dir(self.query_dir, relabel=False)
         gallery = self.process_dir(self.gallery_dir, relabel=False)
         if self.market1501_500k:
             gallery += self.process_dir(self.extra_gallery_dir, relabel=False)
 
-        super(RegDB, self).__init__(train, query, gallery, **kwargs)
+        super(RegDB, self).__init__(train, validation, query, gallery, **kwargs)
 
     def process_dir(self, dir_path, relabel=False):
         img_paths = glob.glob(os.path.join(dir_path, '*.bmp'))

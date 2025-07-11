@@ -12,8 +12,10 @@ parser.add_argument("--config", type=str, default="", help='config path')
 
 
 parser.add_argument("--datadir", type=str,
-                    default="C:/Users/Howon_LEE/Desktop/Hard_Data/ReIDataset_Reg_A", help='dataset directory root')
+                    default="C:/Users/Howon_LEE/Desktop/Hard_Data_validation/ReIDataset_Reg_A", help='dataset directory root')
 parser.add_argument('--data_train', type=str,
+                    default='REGDB', help='train dataset name')
+parser.add_argument('--data_validation', type=str,
                     default='REGDB', help='train dataset name')
 parser.add_argument('--data_test', type=str,
                     default='REGDB', help='test dataset name')
