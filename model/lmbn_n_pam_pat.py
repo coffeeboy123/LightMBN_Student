@@ -148,6 +148,7 @@ class LMBN_n_pam_pat(nn.Module):
         f_c0 = self.reduction_ch_0(c0)
         f_c1 = self.reduction_ch_1(c1)
 
+
         ################
 
         fea = [f_glo[-1], f_glo_drop[-1], f_p0[-1]]
