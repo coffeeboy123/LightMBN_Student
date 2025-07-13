@@ -19,12 +19,21 @@ class LMBN_n_pam_pat(nn.Module):
 
         osnet = osnet_x1_0(pretrained=True)
 
+        self.pam_head  = PAM_Module(512)
+        self.pam_upper = PAM_Module(512)
+        self.pam_lower = PAM_Module(512)
+
+        self.w_head = nn.Parameter(torch.tensor(1.0))
+        self.w_upper = nn.Parameter(torch.tensor(1.0))
+        self.w_lower = nn.Parameter(torch.tensor(1.0))
+
         self.backone = nn.Sequential(
             osnet.conv1,
             osnet.maxpool,
             osnet.conv2,
             osnet.conv3[0]
         )
+
 
         conv3 = osnet.conv3[1:]
 
@@ -36,6 +45,9 @@ class LMBN_n_pam_pat(nn.Module):
 
         self.channel_branch = nn.Sequential(copy.deepcopy(
             conv3), copy.deepcopy(osnet.conv4), copy.deepcopy(osnet.conv5))
+        
+
+
         self.global_pooling = nn.AdaptiveMaxPool2d((1, 1))
         self.partial_pooling = nn.AdaptiveAvgPool2d((2, 1))
         self.channel_pooling = nn.AdaptiveAvgPool2d((1, 1))
@@ -75,10 +87,10 @@ class LMBN_n_pam_pat(nn.Module):
 
         x = self.backone(x)
 
+
         glo = self.global_branch(x)
         par = self.partial_branch(x)
         cha = self.channel_branch(x)
-
 
         if self.activation_map:
             glo_ = glo
