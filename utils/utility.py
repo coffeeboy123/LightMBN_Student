@@ -44,17 +44,17 @@ class checkpoint():
         else:
             self.fold = 'A'
 
-        exp_folder = f"{args.model}_{args.data_train}_{self.fold}_{args.batchid}_{args.batchimage}_{args.batchtest}_{args.epochs}"
+        exp_folder = f"{args.model}_{args.data_train}_{self.fold}_{args.batchid}_{args.batchimage}_{args.lr}_{args.batchtest}_{args.epochs}"
         self.dir = os.path.join('/content/gdrive/MyDrive/SAVE_VAL', exp_folder)
         _make_dir(self.dir)
 
 
 
-        self.log_filename = f"{args.model}_{args.data_train}_{self.fold}_{args.batchid}_{args.batchimage}_{args.batchtest}_{args.epochs}_log.txt"
-        self.map_log_filename = f"{args.model}_{args.data_train}_{self.fold}_{args.batchid}_{args.batchimage}_{args.batchtest}_{args.epochs}map_log.pt"
-        self.config_filename = f"{args.model}_{args.data_train}_{self.fold}_{args.batchid}_{args.batchimage}_{args.batchtest}_{args.epochs}_config.yaml"
-        self.model_latest_filename = f"{args.model}_{args.data_train}_{self.fold}_{args.batchid}_{args.batchimage}_{args.batchtest}_{args.epochs}_model-latest.pth"
-        self.model_best_filename = f"{args.model}_{args.data_train}_{self.fold}_{args.batchid}_{args.batchimage}_{args.batchtest}_{args.epochs}_model-best.pth"
+        self.log_filename = f"{args.model}_{args.data_train}_{self.fold}_{args.batchid}_{args.batchimage}_{args.lr}_{args.batchtest}_{args.epochs}_log.txt"
+        self.map_log_filename = f"{args.model}_{args.data_train}_{self.fold}_{args.batchid}_{args.batchimage}_{args.lr}_{args.batchtest}_{args.epochs}map_log.pt"
+        self.config_filename = f"{args.model}_{args.data_train}_{self.fold}_{args.batchid}_{args.batchimage}_{args.lr}_{args.batchtest}_{args.epochs}_config.yaml"
+        self.model_latest_filename = f"{args.model}_{args.data_train}_{self.fold}_{args.batchid}_{args.batchimage}_{args.lr}_{args.batchtest}_{args.epochs}_model-latest.pth"
+        self.model_best_filename = f"{args.model}_{args.data_train}_{self.fold}_{args.batchid}_{args.batchimage}_{args.lr}_{args.batchtest}_{args.epochs}_model-best.pth"
 
         map_log_path = os.path.join(self.dir, self.map_log_filename)
         if os.path.exists(map_log_path):
