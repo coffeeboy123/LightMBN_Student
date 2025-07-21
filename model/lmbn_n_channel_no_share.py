@@ -52,11 +52,11 @@ class LMBN_n_channel_no_share(nn.Module):
 
         self.no_shared_1 = nn.Sequential(nn.Conv2d(
             512, 512, 1, bias=False), nn.BatchNorm2d(args.feats), nn.ReLU(True))
-        self.weights_init_kaiming(self.shared)
+        self.weights_init_kaiming(self.no_shared_1)
 
         self.no_shared_2 = nn.Sequential(nn.Conv2d(
             512, 512, 1, bias=False), nn.BatchNorm2d(args.feats), nn.ReLU(True))
-        self.weights_init_kaiming(self.shared)
+        self.weights_init_kaiming(self.no_shared_2)
 
         self.reduction_ch_0 = BNNeck(
             args.feats, args.num_classes, return_f=True)
