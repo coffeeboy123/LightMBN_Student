@@ -137,7 +137,7 @@ class LMBN_n_fusion_3(nn.Module):
 
         p_head = p_head * weights[:, 0:1, :, :]
         p_upper = p_upper * weights[:, 1:2, :, :]
-        p_lower = p_lower * weights[:, 2:3, :, :] 
+        p_lower = p_lower * weights[:, 2:3, :, :]
 
         f_glo = self.reduction_0(glo)
         f_p0 = self.reduction_1(g_par)
