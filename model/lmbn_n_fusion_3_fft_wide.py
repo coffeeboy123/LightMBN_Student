@@ -11,9 +11,9 @@ from .partwisefftgate_wise import PartWiseFFTGate_wise
 
 
 
-class LMBN_n_fusion_3_fft_wise(nn.Module):
+class LMBN_n_fusion_3_fft_wide(nn.Module):
     def __init__(self, args):
-        super(LMBN_n_fusion_3_fft_wise, self).__init__()
+        super(LMBN_n_fusion_3_fft_wide, self).__init__()
 
         self.n_ch = 2
         self.chs = 512 // self.n_ch
