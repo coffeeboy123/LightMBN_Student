@@ -127,6 +127,53 @@ class BatchDropTop(nn.Module):
             x = x * mask
         return x
 
+class BatchDropMiddle(nn.Module):
+    """
+    Middle DropBlock: activation이 중간인 행(row)을 제거하는 모듈
+    """
+    def __init__(self, h_ratio):
+        super(BatchDropMiddle, self).__init__()
+        self.h_ratio = h_ratio
+
+    def forward(self, x, visdrop=False):
+        # 학습 중이거나 visdrop=True 일 때만 동작
+        if self.training or visdrop:
+            b, c, h, w = x.size()
+            rh = round(self.h_ratio * h)
+
+            # 각 위치별 activation strength 계산
+            act = (x ** 2).sum(1)               # (B, H, W)
+            act = act.view(b, h * w)            # (B, H*W)
+            act = F.normalize(act, p=2, dim=1)  # L2 정규화
+            act = act.view(b, h, w)             # (B, H, W)
+
+            # 각 행(row)마다 최대 activation 값 추출
+            max_act, _ = act.max(2)             # (B, H)
+
+            # activation 기준으로 행 인덱스 정렬
+            ind = torch.argsort(max_act, dim=1) # (B, H)
+
+            # 중간 rh개 인덱스 선택
+            start = (h - rh) // 2
+            mid_inds = ind[:, start:start + rh] # (B, rh)
+
+            # mask 생성
+            mask = []
+            for i in range(b):
+                rmask = torch.ones(h, device=x.device)
+                rmask[mid_inds[i]] = 0
+                mask.append(rmask.unsqueeze(0))
+            mask = torch.cat(mask, dim=0)       # (B, H)
+            mask = mask.unsqueeze(2).repeat(1, 1, w)     # (B, H, W)
+            mask = mask.unsqueeze(1).repeat(1, c, 1, 1)  # (B, C, H, W)
+
+            if visdrop:
+                return mask  # mask 반환
+
+            return x * mask
+
+        return x
+
 class BatchDropBottom(nn.Module):
     """Bottom DropBlock: 가장 약한 행(row)을 제거하는 방식"""
     def __init__(self, h_ratio):
@@ -273,6 +320,37 @@ class BatchFeatureErase_Top_Bottom_Element(nn.Module):
             return x_top, x_bottom, x_element  # 모두 mask일 수 있음
 
         return x_top, x_bottom, x_element, features
+
+class BatchFeatureErase_Top_Mid_Bottom_Element(nn.Module):
+    """
+    Top / Middle / Bottom DropBlock + Element-wise Dropout 조합 모듈.
+    """
+    def __init__(self, channels, bottleneck_type, h_ratio=0.33, element_drop_prob=0.33):
+        super(BatchFeatureErase_Top_Mid_Bottom_Element, self).__init__()
+        # shared bottleneck
+        self.drop_batch_bottleneck = bottleneck_type(channels, 512)
+        # Top / Mid / Bottom DropBlock
+        self.drop_top = BatchDropTop(h_ratio)
+        self.drop_mid = BatchDropMiddle(h_ratio)
+        self.drop_bottom = BatchDropBottom(h_ratio)
+        # element-wise dropout
+        self.element_dropout = BatchElementDropout(drop_prob=element_drop_prob)
+
+    def forward(self, x, visdrop=False):
+        # 1) Bottleneck features
+        features = self.drop_batch_bottleneck(x)
+        # 2) Top / Mid / Bottom masked
+        x_top    = self.drop_top   (features, visdrop=visdrop)
+        x_mid    = self.drop_mid   (features, visdrop=visdrop)
+        x_bottom = self.drop_bottom(features, visdrop=visdrop)
+        # 3) Element-wise dropout
+        x_element = self.element_dropout(features)
+        # 4) If visdrop, return masks only
+        if visdrop:
+            return x_top, x_mid, x_bottom, x_element
+        # 5) Otherwise return masked features + bottleneck features
+        return x_top, x_mid, x_bottom, x_element, features
+
 
 
 
