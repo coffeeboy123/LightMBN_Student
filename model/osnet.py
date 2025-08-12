@@ -426,8 +426,8 @@ def osnet_x0_5(num_classes=1000, pretrained=True, loss='softmax', **kwargs):
 
 def osnet_x0_25(num_classes=1000, pretrained=True, loss='softmax', **kwargs):
     # very tiny size (width x0.25)
-    model = OSNet(num_classes, blocks=[OSBlock, OSBlock, OSBlock], layers=[1, 1, 1],
-                  channels=[64, 128, 384, 512], loss=loss, **kwargs)
+    model = OSNet(num_classes, blocks=[OSBlock, OSBlock, OSBlock], layers=[2, 2, 2],
+                  channels=[16, 64, 96, 128], loss=loss, **kwargs)
     if pretrained:
         init_pretrained_weights(model, key='osnet_x0_25')
     return model
@@ -440,4 +440,12 @@ def osnet_ibn_x1_0(num_classes=1000, pretrained=True, loss='softmax', **kwargs):
                   channels=[64, 256, 384, 512], loss=loss, IN=True, **kwargs)
     if pretrained:
         init_pretrained_weights(model, key='osnet_ibn_x1_0')
+    return model
+
+def osnet_x1_0_student(num_classes=1000, pretrained=True, loss='softmax', **kwargs):
+    # standard size (width x1.0)
+    model = OSNet(num_classes, blocks=[OSBlock, OSBlock, OSBlock], layers=[1, 1, 1],
+                  channels=[64, 256, 384, 512], loss=loss, **kwargs)
+    if pretrained:
+        init_pretrained_weights(model, key='osnet_x1_0')
     return model
