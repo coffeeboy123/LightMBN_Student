@@ -380,6 +380,33 @@ class BatchFeatureErase_Top_Bottom_Element(nn.Module):
             return x_top, x_bottom, x_element  # 모두 mask일 수 있음
 
         return x_top, x_bottom, x_element, features
+    
+
+class BatchFeatureErase_Top_Bottom_Element_student(nn.Module):
+    """
+    Top DropBlock + Bottom DropBlock + Element-wise Dropout 조합 모듈.
+    """
+
+    def __init__(self, channels, bottleneck_type, h_ratio=0.33, element_drop_prob=0.33):
+        super(BatchFeatureErase_Top_Bottom_Element, self).__init__()
+
+        self.drop_batch_bottleneck = bottleneck_type(channels, 128)
+
+        self.drop_batch_drop_top = BatchDropTop(h_ratio)
+        self.drop_batch_drop_bottom = BatchDropBottom(h_ratio)
+        self.element_dropout = BatchElementDropout(drop_prob=element_drop_prob)
+
+    def forward(self, x, visdrop=False):
+        features = self.drop_batch_bottleneck(x)
+
+        x_top = self.drop_batch_drop_top(features, visdrop=visdrop)
+        x_bottom = self.drop_batch_drop_bottom(features, visdrop=visdrop)
+        x_element = self.element_dropout(features)
+
+        if visdrop:
+            return x_top, x_bottom, x_element  # 모두 mask일 수 있음
+
+        return x_top, x_bottom, x_element, features
 
 class BatchFeatureErase_Top_Mid_Bottom_Element(nn.Module):
     """

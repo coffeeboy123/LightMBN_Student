@@ -2,7 +2,7 @@ import copy
 import torch
 from torch import nn
 from .osnet import osnet_x0_25, OSBlock
-from .attention import BatchDrop, BatchFeatureErase_Top_student, PAM_Module, CAM_Module, SE_Module, Dual_Module, BatchFeatureErase_Top_Bottom_Element
+from .attention import BatchDrop, BatchFeatureErase_Top_student, PAM_Module, CAM_Module, SE_Module, Dual_Module, BatchFeatureErase_Top_Bottom_Element_student
 from .bnneck import BNNeck, BNNeck3
 from torch.nn import functional as F
 
@@ -72,7 +72,7 @@ class LMBN_n_osnet_x0_25_student_full(nn.Module):
         # print('Using batch drop block.')
         # self.batch_drop_block = BatchDrop(
         #     h_ratio=args.h_ratio, w_ratio=args.w_ratio)
-        self.batch_drop_block = BatchFeatureErase_Top_Bottom_Element(args.feats, OSBlock)
+        self.batch_drop_block = BatchFeatureErase_Top_Bottom_Element_student(args.feats, OSBlock)
 
         self.activation_map = args.activation_map
 
