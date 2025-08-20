@@ -9,9 +9,9 @@ from torch.nn import functional as F
 from torch.autograd import Variable
 from .partweightgate import PartWeightGate_student
 
-class LMBN_n_osnet_x0_25_student(nn.Module):
+class LMBN_n_osnet_x0_25_student_full(nn.Module):
     def __init__(self, args):
-        super(LMBN_n_osnet_x0_25_student, self).__init__()
+        super(LMBN_n_osnet_x0_25_student_full, self).__init__()
 
         self.part_gate = PartWeightGate_student()
         self.part_gate.apply(self.weights_init_kaiming)
