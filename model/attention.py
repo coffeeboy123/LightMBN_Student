@@ -388,7 +388,7 @@ class BatchFeatureErase_Top_Bottom_Element_student(nn.Module):
     """
 
     def __init__(self, channels, bottleneck_type, h_ratio=0.33, element_drop_prob=0.33):
-        super(BatchFeatureErase_Top_Bottom_Element, self).__init__()
+        super(BatchFeatureErase_Top_Bottom_Element_student, self).__init__()
 
         self.drop_batch_bottleneck = bottleneck_type(channels, 128)
 
