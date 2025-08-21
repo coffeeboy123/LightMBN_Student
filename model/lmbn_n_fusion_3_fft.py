@@ -41,12 +41,12 @@ class LMBN_n_fusion_3_fft(nn.Module):
         self.channel_branch = nn.Sequential(copy.deepcopy(
             conv3), copy.deepcopy(osnet.conv4), copy.deepcopy(osnet.conv5))
 
-
         self.freq_branch = nn.Sequential(copy.deepcopy(
             conv3), copy.deepcopy(osnet.conv4), copy.deepcopy(osnet.conv5))
 
+        # 학습형 경계: low / high 한 개 경계만 사용
         self.falpha = nn.Parameter(torch.tensor(0.35))  # 초기값은 0.3~0.4 권장
-        self.fk     = 10.0    
+        self.fk     = 10.0                               # 경계 날카로움
 
 
         self.global_pooling = nn.AdaptiveMaxPool2d((1, 1))
@@ -55,7 +55,7 @@ class LMBN_n_fusion_3_fft(nn.Module):
         self.average_pooling = nn.AdaptiveAvgPool2d((1, 1))
 
         reduction = BNNeck3(512, args.num_classes,
-                            args.feats_teacher, return_f=True)
+                            args.feats, return_f=True)
 
         self.reduction_0 = copy.deepcopy(reduction)
         self.reduction_1 = copy.deepcopy(reduction)
@@ -69,17 +69,17 @@ class LMBN_n_fusion_3_fft(nn.Module):
         self.reduction_f_high = copy.deepcopy(reduction)
 
         self.no_shared_1 = nn.Sequential(nn.Conv2d(
-            512, 512, 1, bias=False), nn.BatchNorm2d(args.feats_teacher), nn.ReLU(True))
+            512, 512, 1, bias=False), nn.BatchNorm2d(args.feats), nn.ReLU(True))
         self.weights_init_kaiming(self.no_shared_1)
 
         self.no_shared_2 = nn.Sequential(nn.Conv2d(
-            512, 512, 1, bias=False), nn.BatchNorm2d(args.feats_teacher), nn.ReLU(True))
+            512, 512, 1, bias=False), nn.BatchNorm2d(args.feats), nn.ReLU(True))
         self.weights_init_kaiming(self.no_shared_2)
 
         self.reduction_ch_0 = BNNeck(
-            args.feats_teacher, args.num_classes, return_f=True)
+            args.feats, args.num_classes, return_f=True)
         self.reduction_ch_1 = BNNeck(
-            args.feats_teacher, args.num_classes, return_f=True)
+            args.feats, args.num_classes, return_f=True)
 
 
         # if args.drop_block:
@@ -120,7 +120,7 @@ class LMBN_n_fusion_3_fft(nn.Module):
             print('Generating activation maps...')
 
             return glo, glo_, fmap_c0, fmap_c1, fmap_p0, fmap_p1
-
+        
         X = torch.fft.rfft2(fre, norm="ortho")  # (B,512,Hf,W2)
         B, C, Hf, W2 = X.shape
 
@@ -150,7 +150,7 @@ class LMBN_n_fusion_3_fft(nn.Module):
         g_par = self.global_pooling(par)  # shape:(batchsize, 512,1,1)
         p_par = self.partial_pooling(par)  # shape:(batchsize, 512,2,1)
         cha = self.channel_pooling(cha)  # shape:(batchsize, 256,1,1)
-        
+
         f_low  = self.average_pooling(f_low)   # (B,512,1,1)
         f_high = self.average_pooling(f_high)
 
@@ -173,7 +173,7 @@ class LMBN_n_fusion_3_fft(nn.Module):
 
         p_head = p_head * weights[:, 0:1, :, :]
         p_upper = p_upper * weights[:, 1:2, :, :]
-        p_lower = p_lower * weights[:, 2:3, :, :]
+        p_lower = p_lower * weights[:, 2:3, :, :] 
 
         f_glo = self.reduction_0(glo)
         f_p0 = self.reduction_1(g_par)
@@ -192,7 +192,7 @@ class LMBN_n_fusion_3_fft(nn.Module):
 
         fea = [f_glo[-1], f_glo_drop[-1], f_p0[-1]]
 
-        return [fF_low[1], fF_high[1], f_glo_element[1], f_glo_bottom[1], f_glo[1], f_glo_drop[1], f_p0[1], f_p1[1], f_p2[1], f_p3[1], f_c0[1], f_c1[1]], fea, torch.stack([fF_low[0], fF_high[0], f_glo[0], f_glo_drop[0], f_p0[0], f_p1[0], f_p2[0], f_p3[0], f_c0[0], f_c1[0]], dim=2), torch.stack([f_glo[1], f_p0[1], f_p1[1], f_p2[1], f_p3[1], f_c0[1], f_c1[1]], dim=1)
+        return [fF_low[1], fF_high [1], f_glo_element[1], f_glo_bottom[1], f_glo[1], f_glo_drop[1], f_p0[1], f_p1[1], f_p2[1], f_p3[1], f_c0[1], f_c1[1]], fea, torch.stack([fF_low[0], fF_high [0], f_glo[0], f_glo_drop[0], f_p0[0], f_p1[0], f_p2[0], f_p3[0], f_c0[0], f_c1[0]], dim=2)
 
     def weights_init_kaiming(self, m):
         classname = m.__class__.__name__
