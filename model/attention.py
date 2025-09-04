@@ -297,6 +297,36 @@ class BatchFeatureErase_Top_osnet_x0_5(nn.Module):
             return x, features
         else:
             return x
+        
+class BatchFeatureErase_Top_osnet_x0_25(nn.Module):
+    """
+    Ref: Top-DB-Net: Top DropBlock for Activation Enhancement in Person Re-Identification
+    https://github.com/RQuispeC/top-dropblock/blob/master/torchreid/models/bdnet.py
+    Created by: RQuispeC
+
+    """
+
+    def __init__(self, channels, bottleneck_type, h_ratio=0.33, w_ratio=1., double_bottleneck=False):
+        super(BatchFeatureErase_Top_osnet_x0_25, self).__init__()
+
+        self.drop_batch_bottleneck = bottleneck_type(channels, 128)
+
+        self.drop_batch_drop_basic = BatchDrop(h_ratio, w_ratio)
+        self.drop_batch_drop_top = BatchDropTop(h_ratio)
+
+    def forward(self, x, drop_top=True, bottleneck_features=True, visdrop=False):
+        features = self.drop_batch_bottleneck(x)
+
+        if drop_top:
+            x = self.drop_batch_drop_top(features, visdrop=visdrop)
+        else:
+            x = self.drop_batch_drop_basic(features, visdrop=visdrop)
+        if visdrop:
+            return x  # x is dropmask
+        if bottleneck_features:
+            return x, features
+        else:
+            return x
 
 class BatchFeatureErase_Top_Bottom(nn.Module):
     """

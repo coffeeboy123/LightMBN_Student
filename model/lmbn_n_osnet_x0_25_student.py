@@ -2,19 +2,16 @@ import copy
 import torch
 from torch import nn
 from .osnet import osnet_x0_25, OSBlock
-from .attention import BatchDrop, BatchFeatureErase_Top_student, PAM_Module, CAM_Module, SE_Module, Dual_Module
+from .attention import BatchDrop, PAM_Module, CAM_Module, SE_Module, Dual_Module, BatchFeatureErase_Top_osnet_x0_25
 from .bnneck import BNNeck, BNNeck3
 from torch.nn import functional as F
 
 from torch.autograd import Variable
-from .partweightgate import PartWeightGate_student
+from .partweightgate import PartWeightGate_256
 
 class LMBN_n_osnet_x0_25_student(nn.Module):
     def __init__(self, args):
         super(LMBN_n_osnet_x0_25_student, self).__init__()
-
-        self.part_gate = PartWeightGate_student()
-        self.part_gate.apply(self.weights_init_kaiming)
 
         osnet = osnet_x0_25(pretrained=True)
 
@@ -41,7 +38,7 @@ class LMBN_n_osnet_x0_25_student(nn.Module):
         self.channel_pooling = nn.AdaptiveAvgPool2d((1, 2))
         self.average_pooling = nn.AdaptiveAvgPool2d((1, 1))
 
-        reduction = BNNeck3(128, args.num_classes,
+        reduction = BNNeck3(args.feats, args.num_classes,
                             args.feats, return_f=True)
 
         self.reduction_0 = copy.deepcopy(reduction)
@@ -51,12 +48,13 @@ class LMBN_n_osnet_x0_25_student(nn.Module):
         self.reduction_4 = copy.deepcopy(reduction)
         self.reduction_5 = copy.deepcopy(reduction)
 
+
         self.no_shared_1 = nn.Sequential(nn.Conv2d(
-            128, 128, 1, bias=False), nn.BatchNorm2d(args.feats), nn.ReLU(True))
+            args.feats, args.feats, 1, bias=False), nn.BatchNorm2d(args.feats), nn.ReLU(True))
         self.weights_init_kaiming(self.no_shared_1)
 
         self.no_shared_2 = nn.Sequential(nn.Conv2d(
-            128, 128, 1, bias=False), nn.BatchNorm2d(args.feats), nn.ReLU(True))
+            args.feats, args.feats, 1, bias=False), nn.BatchNorm2d(args.feats), nn.ReLU(True))
         self.weights_init_kaiming(self.no_shared_2)
 
         self.reduction_ch_0 = BNNeck(
@@ -70,7 +68,7 @@ class LMBN_n_osnet_x0_25_student(nn.Module):
         # print('Using batch drop block.')
         # self.batch_drop_block = BatchDrop(
         #     h_ratio=args.h_ratio, w_ratio=args.w_ratio)
-        self.batch_drop_block = BatchFeatureErase_Top_student(128, OSBlock)
+        self.batch_drop_block = BatchFeatureErase_Top_osnet_x0_25(args.feats, OSBlock)
 
         self.activation_map = args.activation_map
 
@@ -116,20 +114,12 @@ class LMBN_n_osnet_x0_25_student(nn.Module):
         p_upper = F.adaptive_avg_pool2d(p_upper, (1, 1))
         p_lower = F.adaptive_avg_pool2d(p_lower, (1, 1))
 
-        weights = self.part_gate(p_head, p_upper, p_lower)
-
-        p_head = p_head * weights[:, 0:1, :, :]
-        p_upper = p_upper * weights[:, 1:2, :, :]
-        p_lower = p_lower * weights[:, 2:3, :, :]
-
-
         f_glo = self.reduction_0(glo)
         f_p0 = self.reduction_1(g_par)
         f_p1 = self.reduction_2(p_head)
         f_p2 = self.reduction_3(p_upper)
         f_p3 = self.reduction_4(p_lower)
         f_glo_drop = self.reduction_5(glo_drop)
-
         ################
 
         c0 = cha[:, :, :, 0:1]
@@ -144,7 +134,7 @@ class LMBN_n_osnet_x0_25_student(nn.Module):
         fea = [f_glo[-1], f_glo_drop[-1], f_p0[-1]]
 
 
-        return [f_glo[1], f_glo_drop[1], f_p0[1], f_p1[1], f_p2[1], f_p3[1],  f_c0[1], f_c1[1]], fea, torch.stack([f_glo[0], f_glo_drop[0], f_p0[0], f_p1[0], f_p2[0], f_p3[0], f_c0[0], f_c1[0]], dim=2)
+        return [f_glo[1], f_glo_drop[1], f_p0[1], f_p1[1], f_p2[1], f_p3[1], f_c0[1], f_c1[1]], fea, torch.stack([f_glo[0], f_glo_drop[0], f_p0[0], f_p1[0], f_p2[0], f_p3[0], f_c0[0], f_c1[0]], dim=2)
 
     def weights_init_kaiming(self, m):
         classname = m.__class__.__name__
