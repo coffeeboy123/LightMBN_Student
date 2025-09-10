@@ -9,7 +9,6 @@ from torch.nn import functional as F
 from torch.autograd import Variable
 
 from .partweightgate import PartWeightGate
-from .partweightgate import ChannelWeightGate
 
 
 class LMBN_n_fusion_4(nn.Module):
@@ -21,8 +20,6 @@ class LMBN_n_fusion_4(nn.Module):
 
         self.part_gate = PartWeightGate()
         self.part_gate.apply(self.weights_init_kaiming)
-        self.channel_gate = ChannelWeightGate()
-        self.channel_gate.apply(self.weights_init_kaiming)
 
         osnet = osnet_x1_0(pretrained=True)
 
@@ -125,10 +122,6 @@ class LMBN_n_fusion_4(nn.Module):
         c1 = cha[:, :, :, 1:2]
         c0 = self.no_shared_1(c0)
         c1 = self.no_shared_2(c1)
-        weights = self.channel_gate(c0, c1)
-        c0 = c0 * weights[:, 0:1, :, :]
-        c1 = c1 * weights[:, 1:2, :, :]
-
         f_c0 = self.reduction_ch_0(c0)
         f_c1 = self.reduction_ch_1(c1)
 
@@ -144,7 +137,7 @@ class LMBN_n_fusion_4(nn.Module):
 
         p_head = p_head * weights[:, 0:1, :, :]
         p_upper = p_upper * weights[:, 1:2, :, :]
-        p_lower = p_lower * weights[:, 2:3, :, :] 
+        p_lower = p_lower * weights[:, 2:3, :, :]
 
         f_glo = self.reduction_0(glo)
         f_p0 = self.reduction_1(g_par)
@@ -161,7 +154,16 @@ class LMBN_n_fusion_4(nn.Module):
 
         fea = [f_glo[-1], f_glo_drop[-1], f_p0[-1]]
 
-        return [f_glo_element[1], f_glo_bottom[1], f_glo[1], f_glo_drop[1], f_p0[1], f_p1[1], f_p2[1], f_p3[1], f_c0[1], f_c1[1]], fea, torch.stack([f_glo[0], f_glo_drop[0], f_p0[0], f_p1[0], f_p2[0], f_p3[0], f_c0[0], f_c1[0]], dim=2)
+        aux = {
+            "comp_c0": f_c0[0],  # after_neck: (B, D)
+            "comp_c1": f_c1[0],  # after_neck: (B, D)
+        }
+
+        return [f_glo_element[1], f_glo_bottom[1], f_glo[1], f_glo_drop[1], f_p0[1], f_p1[1], f_p2[1], f_p3[1], f_c0[1],
+                f_c1[1]], \
+            fea, \
+            torch.stack([f_glo[0], f_glo_drop[0], f_p0[0], f_p1[0], f_p2[0], f_p3[0], f_c0[0], f_c1[0]], dim=2), \
+            aux
 
     def weights_init_kaiming(self, m):
         classname = m.__class__.__name__
