@@ -137,7 +137,7 @@ class checkpoint():
                         dpi=600)
             plt.close(fig)
 
-         if any(x is not None for x in train_aux):
+        if any(x is not None for x in train_aux):
             fig = plt.figure()
             plt.plot(range(1, len(train_aux) + 1), train_aux, label='Train AUX', color='blue')
             plt.plot(range(1, len(val_aux) + 1), val_aux, label='Val AUX', color='orange')
