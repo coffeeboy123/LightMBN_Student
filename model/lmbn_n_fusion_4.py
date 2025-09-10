@@ -5,7 +5,7 @@ from .osnet import osnet_x1_0, OSBlock
 from .attention import BatchDrop, BatchFeatureErase_Top, PAM_Module, CAM_Module, SE_Module, Dual_Module, BatchFeatureErase_Top_Bottom, BatchFeatureErase_Top_Bottom_Element
 from .bnneck import BNNeck, BNNeck3
 from torch.nn import functional as F
-
+from .bilateral_ot import BilateralOTSplit
 from torch.autograd import Variable
 
 from .partweightgate import PartWeightGate
@@ -14,6 +14,11 @@ from .partweightgate import PartWeightGate
 class LMBN_n_fusion_4(nn.Module):
     def __init__(self, args):
         super(LMBN_n_fusion_4, self).__init__()
+
+        self.use_ot_split = getattr(args, "use_ot_split", True)
+        if self.use_ot_split:
+            self.ot_split = BilateralOTSplit(in_ch=512, eps=getattr(args, "ot_eps", 0.07),
+                                             iters=getattr(args, "ot_iters", 7))
 
         self.n_ch = 2
         self.chs = 512 // self.n_ch
@@ -116,12 +121,16 @@ class LMBN_n_fusion_4(nn.Module):
         glo = self.average_pooling(glo)  # shape:(batchsize, 512,1,1)
         g_par = self.global_pooling(par)  # shape:(batchsize, 512,1,1)
         p_par = self.partial_pooling(par)  # shape:(batchsize, 512,2,1)
-        cha = self.channel_pooling(cha)  # shape:(batchsize, 256,1,1)
 
-        c0 = cha[:, :, :, 0:1]
-        c1 = cha[:, :, :, 1:2]
-        c0 = self.no_shared_1(c0)
-        c1 = self.no_shared_2(c1)
+        if self.use_ot_split:
+            c0_512, c1_512, ot_masks = self.ot_split(cha)  # (B,512,1,1), (B,512,1,1)
+            c0 = self.no_shared_1(c0_512)
+            c1 = self.no_shared_2(c1_512)
+        else:
+            cha_p = self.channel_pooling(cha)
+            c0 = self.no_shared_1(cha_p[:, :, :, 0:1])
+            c1 = self.no_shared_2(cha_p[:, :, :, 1:2])
+
         f_c0 = self.reduction_ch_0(c0)
         f_c1 = self.reduction_ch_1(c1)
 
@@ -154,16 +163,7 @@ class LMBN_n_fusion_4(nn.Module):
 
         fea = [f_glo[-1], f_glo_drop[-1], f_p0[-1]]
 
-        aux = {
-            "comp_c0": f_c0[0],  # after_neck: (B, D)
-            "comp_c1": f_c1[0],  # after_neck: (B, D)
-        }
-
-        return [f_glo_element[1], f_glo_bottom[1], f_glo[1], f_glo_drop[1], f_p0[1], f_p1[1], f_p2[1], f_p3[1], f_c0[1],
-                f_c1[1]], \
-            fea, \
-            torch.stack([f_glo[0], f_glo_drop[0], f_p0[0], f_p1[0], f_p2[0], f_p3[0], f_c0[0], f_c1[0]], dim=2), \
-            aux
+        return [f_glo_element[1], f_glo_bottom[1], f_glo[1], f_glo_drop[1], f_p0[1], f_p1[1], f_p2[1], f_p3[1], f_c0[1], f_c1[1]], fea, torch.stack([f_glo[0], f_glo_drop[0], f_p0[0], f_p1[0], f_p2[0], f_p3[0], f_c0[0], f_c1[0]], dim=2)
 
     def weights_init_kaiming(self, m):
         classname = m.__class__.__name__

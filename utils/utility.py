@@ -88,7 +88,7 @@ class checkpoint():
         if self.local_dir is not None:
             copyfile(config_path, os.path.join(self.local_dir, self.config_filename))
 
-    def plot_losses(self, train_total, val_total, train_ce, val_ce, train_ms, val_ms, train_aux, val_aux):
+    def plot_losses(self, train_total, val_total, train_ce, val_ce, train_ms, val_ms):
         """
         총 3개 plot을 저장
           - Total loss: train/val
@@ -134,19 +134,6 @@ class checkpoint():
             plt.legend()
             plt.grid(True)
             plt.savefig(os.path.join(self.dir, f'{self.args.model}_{self.args.data_train}_{self.fold}_ms_loss.png'),
-                        dpi=600)
-            plt.close(fig)
-
-        if any(x is not None for x in train_aux):
-            fig = plt.figure()
-            plt.plot(range(1, len(train_aux) + 1), train_aux, label='Train AUX', color='blue')
-            plt.plot(range(1, len(val_aux) + 1), val_aux, label='Val AUX', color='orange')
-            plt.title(f'{self.args.model} AUX Loss')
-            plt.xlabel('Epoch')
-            plt.ylabel('AUX Loss')
-            plt.legend()
-            plt.grid(True)
-            plt.savefig(os.path.join(self.dir, f'{self.args.model}_{self.args.data_train}_{self.fold}_aux_loss.png'),
                         dpi=600)
             plt.close(fig)
 

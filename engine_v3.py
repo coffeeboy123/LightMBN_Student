@@ -48,10 +48,8 @@ class Engine:
 
         self.train_ce_loss_history = []
         self.train_ms_loss_history = []
-        self.train_aux_loss_history = []
         self.val_ce_loss_history = []
         self.val_ms_loss_history = []
-        self.val_aux_loss_history = []
 
         if torch.cuda.is_available():
             self.ckpt.write_log("[INFO] GPU: " + torch.cuda.get_device_name(0))
@@ -82,7 +80,6 @@ class Engine:
         running_loss = 0.0
         ce_running_loss = 0.0
         ms_running_loss = 0.0
-        aux_running_loss = 0.0
 
         self.model.train()
 
@@ -94,15 +91,13 @@ class Engine:
 
             self.optimizer.zero_grad()
             outputs = self.model(inputs)
-            total_loss, ce_loss, ms_loss, aux_loss = self.loss.compute(outputs, labels)
+            total_loss, ce_loss, ms_loss = self.loss.compute(outputs, labels)
 
             running_loss += total_loss.item()
             if ce_loss is not None:
                 ce_running_loss += ce_loss
             if ms_loss is not None:
                 ms_running_loss += ms_loss
-            if aux_loss is not None:
-                aux_running_loss += aux_loss
 
             total_loss.backward()
             self.optimizer.step()
@@ -125,25 +120,21 @@ class Engine:
         self.loss.end_log(len(self.train_loader))
 
         avg_loss = running_loss / len(self.train_loader)
-        avg_ce = ce_running_loss / len(self.train_loader) if ce_running_loss != 0 else None
-        avg_ms = ms_running_loss / len(self.train_loader) if ms_running_loss != 0 else None
-        avg_aux = aux_running_loss / len(self.train_loader) if aux_running_loss != 0 else None
+        avg_ce = ce_running_loss / len(self.train_loader) 
+        avg_ms = ms_running_loss / len(self.train_loader)
 
         # checkpoint에 기록
         self.ckpt.loss_history.append(avg_loss)
         self.train_ce_loss_history.append(avg_ce)
         self.train_ms_loss_history.append(avg_ms)
-        self.train_aux_loss_history.append(avg_aux)
 
         self.writer.add_scalar('Loss/Train_Total', avg_loss, epoch + 1)
         self.writer.add_scalar('Loss/Train_CE', avg_ce, epoch + 1)
         self.writer.add_scalar('Loss/Train_MS', avg_ms, epoch + 1)
-        self.writer.add_scalar('Loss/Train_AUX', avg_aux, epoch + 1)
 
         self._last_train_loss = avg_loss
         self._last_train_ce = avg_ce
         self._last_train_ms = avg_ms
-        self._last_train_aux = avg_aux
 
 
 
@@ -154,7 +145,6 @@ class Engine:
         running_loss = 0.0
         ce_running_loss = 0.0
         ms_running_loss = 0.0
-        aux_running_loss = 0.0
         self.model.eval()
 
         with torch.no_grad():  # <- 반드시 감싸주세요!
@@ -163,14 +153,12 @@ class Engine:
                 inputs = inputs.to(self.device)
                 labels = labels.to(self.device)
                 outputs = self.model(inputs)
-                total_loss, ce_loss, ms_loss, aux_loss = self.loss.compute(outputs, labels)
+                total_loss, ce_loss, ms_loss = self.loss.compute(outputs, labels)
                 running_loss += total_loss.item()
                 if ce_loss is not None:
                     ce_running_loss += ce_loss
                 if ms_loss is not None:
                     ms_running_loss += ms_loss
-                if aux_loss is not None:
-                    aux_running_loss += aux_loss
 
 
                 self.ckpt.write_log(
@@ -188,14 +176,12 @@ class Engine:
                     wandb.log({"val_loss_step": loss.item()})
 
         avg_loss = running_loss / len(self.validation_loader)
-        avg_ce = ce_running_loss / len(self.validation_loader) if ce_running_loss != 0 else None
-        avg_ms = ms_running_loss / len(self.validation_loader) if ms_running_loss != 0 else None
-        avg_aux = aux_running_loss / len(self.validation_loader) if aux_running_loss != 0 else None
+        avg_ce = ce_running_loss / len(self.validation_loader) 
+        avg_ms = ms_running_loss / len(self.validation_loader)
 
         self.ckpt.validation_loss_history.append(avg_loss)
         self.val_ce_loss_history.append(avg_ce)
         self.val_ms_loss_history.append(avg_ms)
-        self.val_aux_loss_history.append(avg_aux)
 
         self.ckpt.plot_losses(
             self.ckpt.loss_history,  # total train loss
@@ -204,14 +190,11 @@ class Engine:
             self.val_ce_loss_history,  # ce val loss
             self.train_ms_loss_history,  # ms train loss
             self.val_ms_loss_history,  # ms val loss
-            self.train_aux_loss_history,  # ms train loss
-            self.val_aux_loss_history,  # ms val loss
         )
 
         self.writer.add_scalar('Loss/Val_Total', avg_loss, epoch + 1)
         self.writer.add_scalar('Loss/Val_CE', avg_ce, epoch + 1)
         self.writer.add_scalar('Loss/Val_MS', avg_ms, epoch + 1)
-        self.writer.add_scalar('Loss/Val_AUX', avg_aux, epoch + 1)
 
         self.writer.add_scalars('Loss/Total', {
             'Train': self._last_train_loss,
@@ -224,10 +207,6 @@ class Engine:
         self.writer.add_scalars('Loss/MS', {
             'Train': self._last_train_ms,
             'Val': avg_ms
-        }, epoch + 1)
-        self.writer.add_scalars('Loss/AUX', {
-            'Train': self._last_train_aux,
-            'Val': avg_aux
         }, epoch + 1)
 
     def test(self):
