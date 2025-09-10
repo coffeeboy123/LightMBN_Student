@@ -12,11 +12,11 @@ import torch.nn as nn
 
 from .triplet import TripletLoss, TripletSemihardLoss, CrossEntropyLabelSmooth
 from .grouploss import GroupLoss
-from loss.multi_similarity_loss import MultiSimilarityLoss
-from loss.focal_loss import FocalLoss
-from loss.osm_caa_loss import OSM_CAA_Loss
-from loss.center_loss import CenterLoss
-
+from .multi_similarity_loss import MultiSimilarityLoss
+from .focal_loss import FocalLoss
+from .osm_caa_loss import OSM_CAA_Loss
+from .center_loss import CenterLoss
+from .complementarity import ComplementarityLoss
 
 class LossFunction:
     def __init__(self, args, ckpt):
@@ -28,6 +28,7 @@ class LossFunction:
         self.loss = []
         ce_value = None
         ms_value = None
+        aux_value = None
         for loss in args.loss.split("+"):
             weight, loss_type = loss.split("*")
             if loss_type == "CrossEntropy":
@@ -55,6 +56,17 @@ class LossFunction:
             elif loss_type == "CenterLoss":
                 loss_function = CenterLoss(
                     num_classes=args.num_classes, feat_dim=args.feats
+                )
+            elif loss_type == "Complementarity":
+                diag_w = getattr(args, "comp_diag_weight", 0.5)
+                offdiag_w = getattr(args, "comp_offdiag_weight", 1.0)
+                var_lambda = getattr(args, "comp_var_lambda", 1.0)
+                var_gamma = getattr(args, "comp_var_gamma", 1.0)
+                loss_function = ComplementarityLoss(
+                    diag_weight=diag_w,
+                    offdiag_weight=offdiag_w,
+                    var_lambda=var_lambda,
+                    var_gamma=var_gamma,
                 )
 
             self.loss.append(
@@ -126,6 +138,34 @@ class LossFunction:
                 losses.append(effective_loss)
                 self.log[-1, i] += effective_loss.item()
 
+            elif l["type"] in ["Complementarity"]:
+                # 우선순위 1: 모델이 4번째로 aux dict를 리턴하는 경우(권장)
+                if isinstance(outputs, (list, tuple)) and len(outputs) >= 4 and isinstance(outputs[3], dict):
+                    aux = outputs[3]
+                    if ("comp_c0" not in aux) or ("comp_c1" not in aux):
+                        raise KeyError("aux dict must contain 'comp_c0' and 'comp_c1'")
+                    z_a = aux["comp_c0"]
+                    z_b = aux["comp_c1"]
+
+                # 백워드 호환: outputs[1] 안의 마지막 두 임베딩을 c0/c1로 간주
+                elif isinstance(outputs[1], list) and len(outputs[1]) >= 2:
+                    z_a = outputs[1][-2]
+                    z_b = outputs[1][-1]
+
+                # 텐서 3D(head)인 경우: 마지막 두 head 사용
+                elif isinstance(outputs[1], torch.Tensor) and outputs[1].dim() == 3 and outputs[1].size(2) >= 2:
+                    z_a = outputs[1][:, :, -2]
+                    z_b = outputs[1][:, :, -1]
+
+                else:
+                    raise TypeError("Complementarity: cannot locate c0/c1 features in outputs")
+
+                loss = l["function"](z_a, z_b)
+                effective_loss = l["weight"] * loss
+                losses.append(effective_loss)
+                aux_value = effective_loss.item()
+                self.log[-1, i] += effective_loss.item()
+
             else:
                 pass
 
@@ -136,7 +176,7 @@ class LossFunction:
         if len(self.loss) > 1:
             self.log[-1, -1] += loss_sum.item()
 
-        return loss_sum, ce_value, ms_value
+        return loss_sum, ce_value, ms_value, aux_value
 
     def start_log(self):
         self.log = torch.cat((self.log, torch.zeros(1, len(self.loss))))
