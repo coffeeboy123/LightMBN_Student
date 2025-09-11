@@ -5,27 +5,29 @@ from .osnet import osnet_x1_0, OSBlock
 from .attention import BatchDrop, BatchFeatureErase_Top, PAM_Module, CAM_Module, SE_Module, Dual_Module, BatchFeatureErase_Top_Bottom, BatchFeatureErase_Top_Bottom_Element
 from .bnneck import BNNeck, BNNeck3
 from torch.nn import functional as F
-from .bilateral_curve import BilateralCurveSplit
+
 from torch.autograd import Variable
 
 from .partweightgate import PartWeightGate
+from .per_sample_soft_split import PerSampleSoftSplit
 
 
 class LMBN_n_fusion_4(nn.Module):
     def __init__(self, args):
         super(LMBN_n_fusion_4, self).__init__()
 
-        self.use_cbs = getattr(args, "use_cbs", True)
-        if self.use_cbs:
-            self.cbs = BilateralCurveSplit(in_ch=512,
-                                   tau_init=getattr(args, "cbs_tau_start", 0.5),
-                                   newton_steps=getattr(args, "cbs_newton", 2))
-
         self.n_ch = 2
         self.chs = 512 // self.n_ch
 
         self.part_gate = PartWeightGate()
         self.part_gate.apply(self.weights_init_kaiming)
+
+        self.soft_split = PerSampleSoftSplit(
+            C=512, tau=getattr(args, "split_tau", 0.5),
+            use_median=getattr(args, "split_use_median", False),
+            reg_w_entropy=getattr(args, "w_split_entropy", 0.0),
+            reg_w_balance=getattr(args, "w_split_balance", 0.0),
+        )
 
         osnet = osnet_x1_0(pretrained=True)
 
@@ -122,16 +124,12 @@ class LMBN_n_fusion_4(nn.Module):
         glo = self.average_pooling(glo)  # shape:(batchsize, 512,1,1)
         g_par = self.global_pooling(par)  # shape:(batchsize, 512,1,1)
         p_par = self.partial_pooling(par)  # shape:(batchsize, 512,2,1)
+        c0, c1, split_reg = self.soft_split(cha)
 
-        if getattr(self, "use_cbs", False):
-            c0_512, c1_512, curve_masks = self.cbs(cha)
-            c0 = self.no_shared_1(c0_512)
-            c1 = self.no_shared_2(c1_512)
-        else:
-            cha_p = self.channel_pooling(cha)
-            c0 = self.no_shared_1(cha_p[:, :, :, 0:1])
-            c1 = self.no_shared_2(cha_p[:, :, :, 1:2])
-
+        c0 = self.average_pooling(c0)       # (B,512,1,1)
+        c1 = self.average_pooling(c1) 
+        c0 = self.no_shared_1(c0)
+        c1 = self.no_shared_2(c1)
         f_c0 = self.reduction_ch_0(c0)
         f_c1 = self.reduction_ch_1(c1)
 
