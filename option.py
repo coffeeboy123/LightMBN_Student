@@ -141,7 +141,7 @@ parser.add_argument(
     help='random seed for reproducibility (default: 42)'
 )
 
-parser.add_argument('--ccsf_swap_prob', type=float, default=0.25,
+parser.add_argument('--ccsf_swap_prob', type=float, default=0.15,
                     help='Stochastic Partial Exchange: per-channel swap probability during training')
 
 
