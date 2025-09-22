@@ -1,3 +1,6 @@
+import torch
+from torch import nn
+
 class SimpleChannelSplit(nn.Module):
     """
     cha: (B, C, H, W) → c0, c1: (B, C, 1, 1)
