@@ -11,7 +11,7 @@ from torch.autograd import Variable
 from .partweightgate import PartWeightGate
 from .globalcontextbranchgate import GlobalContextBranchGateHeavy
 
-
+ 
 class LMBN_n_fusion_10(nn.Module):
     def __init__(self, args):
         super(LMBN_n_fusion_10, self).__init__()
