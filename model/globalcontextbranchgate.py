@@ -2,75 +2,65 @@ import torch
 from torch import nn
 import torch.nn.functional as F
 
-class GlobalContextBranchGateHeavy(nn.Module):
+class GlobalContextBranchGate(nn.Module):
     """
-    입력 x만 사용하되 '전역 문맥'을 강하게 잡도록 일반 conv 위주로 설계한 헤비 버전.
-    병렬 3경로 (모두 일반 conv, groups=1):
-      A) Large 5x5 stack (stride=2)  : 넓은 로컬+중거리 문맥
-      B) Dilated 5x5 stack (rate=2)  : 파라미터 늘리며 수용영역 확장
-      C) Directional (1xK -> Kx1)    : 가로/세로 장거리 문맥(일반 conv로)
-    세 경로 concat → 1x1 fuse(확장) → GAP → 작은 MLP head → softmax → (B,3,1,1)
+    입력 x만 사용하지만, '더 전역적'인 문맥을 보도록 한 게이트.
+    병렬 3경로:
+      - Large 5x5 depthwise (stride=2)
+      - Dilated 5x5 depthwise (dilation=2, stride=2)
+      - Directional (1xK -> Kx1) separable path (세로/가로 장거리 정보)
+    세 경로를 concat → 1x1 fuse → GAP → 3-way logits → softmax
+    출력: (B, 3, 1, 1)
     """
-    def __init__(
-        self,
-        in_ch=3,
-        stem_ch=96,       # 64 -> 96 (표현력 ↑)
-        path_ch=128,      # 각 분기 출력 채널 수
-        k_dir=11,         # 방향성 커널 길이(7/9/11/13 추천)
-        mlp_hidden=512,   # MLP hidden
-        learnable_temp=True,
-        init_T=1.0,
-    ):
+    def __init__(self, in_ch=3, stem_ch=64, hidden=192, k_dir=9, learnable_temp=True, init_T=1.0):
         super().__init__()
+        assert hidden % 3 == 0, "hidden은 3의 배수가 편합니다(각 분기 균등 채널)"
         self.logT = nn.Parameter(torch.log(torch.tensor([init_T], dtype=torch.float32))) if learnable_temp else None
+        h_each = hidden // 3
 
-        # Stem: 일반 3x3 conv로 해상도 1/2 다운 + 채널 확장
+        # Stem: 해상도 1/2로 줄이며 저차원 특징 추출
         self.stem = nn.Sequential(
             nn.Conv2d(in_ch, stem_ch, 3, stride=2, padding=1, bias=False),
             nn.BatchNorm2d(stem_ch), nn.ReLU(inplace=True),
-            nn.Conv2d(stem_ch, stem_ch, 3, stride=1, padding=1, bias=False),
-            nn.BatchNorm2d(stem_ch), nn.ReLU(inplace=True),
         )
 
-        # A: Large 5x5 stack (stride=2)  → H/4, W/4
+        # Branch A: Large Kernel (5x5) depthwise + pointwise
         self.large5 = nn.Sequential(
-            nn.Conv2d(stem_ch, path_ch, 5, stride=2, padding=2, bias=False),
-            nn.BatchNorm2d(path_ch), nn.ReLU(inplace=True),
-            nn.Conv2d(path_ch, path_ch, 5, stride=1, padding=2, bias=False),
-            nn.BatchNorm2d(path_ch), nn.ReLU(inplace=True),
+            nn.Conv2d(stem_ch, stem_ch, 5, stride=2, padding=2, groups=stem_ch, bias=False),
+            nn.BatchNorm2d(stem_ch), nn.ReLU(inplace=True),
+            nn.Conv2d(stem_ch, h_each, 1, bias=False),
+            nn.BatchNorm2d(h_each), nn.ReLU(inplace=True),
         )
 
-        # B: Dilated 5x5 stack (rate=2, stride=2)
+        # Branch B: Dilated (5x5, dilation=2) depthwise + pointwise  → 더 넓은 수용영역
         self.dil5 = nn.Sequential(
-            nn.Conv2d(stem_ch, path_ch, 5, stride=2, padding=4, dilation=2, bias=False),
-            nn.BatchNorm2d(path_ch), nn.ReLU(inplace=True),
-            nn.Conv2d(path_ch, path_ch, 5, stride=1, padding=4, dilation=2, bias=False),
-            nn.BatchNorm2d(path_ch), nn.ReLU(inplace=True),
+            nn.Conv2d(stem_ch, stem_ch, 5, stride=2, padding=4, dilation=2, groups=stem_ch, bias=False),
+            nn.BatchNorm2d(stem_ch), nn.ReLU(inplace=True),
+            nn.Conv2d(stem_ch, h_each, 1, bias=False),
+            nn.BatchNorm2d(h_each), nn.ReLU(inplace=True),
         )
 
-        # C: Directional (1xK -> Kx1) with 일반 conv
+        # Branch C: Directional (1xK -> Kx1) separable path
         pad = k_dir // 2
         self.dir_path = nn.Sequential(
-            nn.Conv2d(stem_ch, path_ch, (1, k_dir), stride=(1, 2), padding=(0, pad), bias=False),
-            nn.BatchNorm2d(path_ch), nn.ReLU(inplace=True),
-            nn.Conv2d(path_ch, path_ch, (k_dir, 1), stride=(2, 1), padding=(pad, 0), bias=False),
-            nn.BatchNorm2d(path_ch), nn.ReLU(inplace=True),
+            # 가로 긴 문맥 (1xK)
+            nn.Conv2d(stem_ch, stem_ch, (1, k_dir), stride=(1, 2), padding=(0, pad), groups=stem_ch, bias=False),
+            nn.BatchNorm2d(stem_ch), nn.ReLU(inplace=True),
+            # 세로 긴 문맥 (Kx1)
+            nn.Conv2d(stem_ch, stem_ch, (k_dir, 1), stride=(2, 1), padding=(pad, 0), groups=stem_ch, bias=False),
+            nn.BatchNorm2d(stem_ch), nn.ReLU(inplace=True),
+            # pointwise 축소
+            nn.Conv2d(stem_ch, h_each, 1, bias=False),
+            nn.BatchNorm2d(h_each), nn.ReLU(inplace=True),
         )
 
-        # Fuse: concat(A,B,C) → 1x1 확장(채널 혼합) → GAP
-        fused_ch = path_ch * 3
+        # Fuse & head
         self.fuse = nn.Sequential(
-            nn.Conv2d(fused_ch, fused_ch, 1, bias=False),
-            nn.BatchNorm2d(fused_ch), nn.ReLU(inplace=True),
+            nn.Conv2d(hidden, hidden, 1, bias=False),
+            nn.BatchNorm2d(hidden), nn.ReLU(inplace=True),
             nn.AdaptiveAvgPool2d(1),
         )
-
-        # Head: 작은 MLP (Conv1x1로 구현) → 3-way 로짓
-        self.head = nn.Sequential(
-            nn.Conv2d(fused_ch, mlp_hidden, 1, bias=False),
-            nn.BatchNorm2d(mlp_hidden), nn.ReLU(inplace=True),
-            nn.Conv2d(mlp_hidden, 3, 1, bias=True),
-        )
+        self.head = nn.Conv2d(hidden, 3, 1, bias=True)
 
         # init
         for m in self.modules():
@@ -81,12 +71,12 @@ class GlobalContextBranchGateHeavy(nn.Module):
 
     def forward(self, x):
         z = self.stem(x)          # (B, stem_ch, H/2, W/2)
-        a = self.large5(z)        # (B, path_ch, H/4, W/4)
-        b = self.dil5(z)          # (B, path_ch, H/4, W/4)
-        c = self.dir_path(z)      # (B, path_ch, H/4, W/4)
-        u = torch.cat([a, b, c], dim=1)  # (B, 3*path_ch, H/4, W/4)
+        a = self.large5(z)        # (B, hidden/3, H/4, W/4)
+        b = self.dil5(z)          # (B, hidden/3, H/4, W/4)
+        c = self.dir_path(z)      # (B, hidden/3, H/4, W/4)
+        u = torch.cat([a, b, c], dim=1)  # (B, hidden, H/4, W/4)
 
-        u = self.fuse(u)          # (B, 3*path_ch, 1, 1)
+        u = self.fuse(u)          # (B, hidden, 1, 1)
         logits = self.head(u)     # (B, 3, 1, 1)
         if self.logT is not None:
             logits = logits / torch.exp(self.logT)

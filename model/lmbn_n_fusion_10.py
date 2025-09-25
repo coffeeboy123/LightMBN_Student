@@ -9,9 +9,9 @@ from torch.nn import functional as F
 from torch.autograd import Variable
 
 from .partweightgate import PartWeightGate
-from .globalcontextbranchgate import GlobalContextBranchGateHeavy
+from .globalcontextbranchgate import GlobalContextBranchGate
 
- 
+
 class LMBN_n_fusion_10(nn.Module):
     def __init__(self, args):
         super(LMBN_n_fusion_10, self).__init__()
@@ -85,14 +85,10 @@ class LMBN_n_fusion_10(nn.Module):
 
         self.use_branch_gate = getattr(args, "use_branch_gate", True)
 
-        self.branch_gate = GlobalContextBranchGateHeavy(
-            in_ch=3,
-            stem_ch=96,      # 64→96
-            path_ch=128,     # 각 분기 채널
-            k_dir=11,        # 7/9/11/13 스윕 추천
-            mlp_hidden=512,  # 256~768 탐색
-            learnable_temp=True,
-            init_T=1.0
+        self.branch_gate = GlobalContextBranchGate(
+            in_ch=3, stem_ch=64, hidden=192,    # hidden은 3의 배수 권장(각 분기 균등)
+            k_dir=9,                            # 방향성 커널 길이(7~15 탐색)
+            learnable_temp=True, init_T=1.0
         )
 
     def forward(self, x):
