@@ -25,7 +25,7 @@ class LMBN_n_fusion_12(nn.Module):
             learnable_temp=True, init_T=1.0
         )
 
-        self.n_ch = 2
+        self.n_ch = 2 
         self.chs = 512 // self.n_ch
 
         self.part_gate = PartWeightGate()
