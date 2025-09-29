@@ -8,7 +8,7 @@ from torch.nn import functional as F
 
 from torch.autograd import Variable
 from .partweightgate import PartWeightGate
-from .global_directional_context_gate import GlobalDirectionalContextGateHeavy
+from .global_directional_context_gate_lite import GlobalDirectionalContextGateLite
 
 
 class LMBN_n_fusion_12(nn.Module):
@@ -16,15 +16,17 @@ class LMBN_n_fusion_12(nn.Module):
         super(LMBN_n_fusion_12, self).__init__()
 
         self.use_branch_gate = getattr(args, "use_branch_gate", True)
-        self.branch_gate = GlobalDirectionalContextGateHeavy(
+        self.branch_gate = GlobalDirectionalContextGateLite(
             in_ch=3,
-            stem_ch=128,       # 96/128/160 스윕
-            path_ch=160,       # 128/160/192 스윕
-            dir_k=15,          # 11/13/15/17 스윕
-            mlp_hidden=512,    # 512/768 스윕
-            learnable_temp=True, init_T=1.0
+            stem_ch=64,       # 48/64/80
+            path_ch=64,       # 48/64/80
+            dir_k=13,         # 11/13/15
+            mlp_hidden=128,   # 128/192
+            norm='bn',
+            learnable_temp=True, init_T=1.0,
+            dropout_p=0.0
         )
-
+        
         self.n_ch = 2 
         self.chs = 512 // self.n_ch
 
