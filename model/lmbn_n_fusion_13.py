@@ -93,13 +93,12 @@ class LMBN_n_fusion_13(nn.Module):
 
         x_back = self.backone(x)
 
-        w_br = self.branch_gate(x, glo, par, cha)  # (B,3,1,1)
-        w_br = w_br.to(glo.dtype).to(glo.device)
-
-
         glo = self.global_branch(x_back)
         par = self.partial_branch(x_back)
         cha = self.channel_branch(x_back)
+
+        w_br = self.branch_gate(x, glo, par, cha)  # (B,3,1,1)
+        w_br = w_br.to(glo.dtype).to(glo.device)
 
         glo = glo * w_br[:, 0:1]
         par = par * w_br[:, 1:2]
